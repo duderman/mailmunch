@@ -1,0 +1,47 @@
+name: pulumi-up
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: Pulumi stack name
+        required: true
+        default: dev
+
+jobs:
+  up:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build Lambda
+        run: |
+          cd ..
+          chmod +x scripts/build-lambda.sh
+          ./scripts/build-lambda.sh hello dist/hello.zip
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Pulumi Up
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ github.event.inputs.stack }}
+          upsert: true
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
