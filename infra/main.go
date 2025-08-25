@@ -76,7 +76,7 @@ func main() {
 		}
 		_, err = appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
 			ApplicationId:          app.ID(),
-			ConfigurationProfileId: profile.ID(),
+			ConfigurationProfileId: profile.ConfigurationProfileId,
 			Content:                pulumi.String("{\"greeting\":\"Hello from AppConfig\"}"),
 			ContentType:            pulumi.String("application/json"),
 		}, awsOpts)

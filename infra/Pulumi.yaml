@@ -2,5 +2,5 @@ name: mailmunch
 runtime:
   name: go
   options:
-    binary: ./
+    binary: ./infra
 description: AWS infra (S3, ECR, Lambda, SecretsManager, AppConfig, SES-ready) with Go Lambda hello
