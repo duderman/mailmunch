@@ -4,8 +4,6 @@ on:
   workflow_run:
     workflows:
       - build
-      - build / Build Lambda artifact
-      - Build Lambda artifact
     types:
       - completed
 
