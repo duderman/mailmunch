@@ -33,6 +33,8 @@ jobs:
         with:
           name: lambda-zip
           path: dist/hello.zip
+          retention-days: 30
+          compression-level: 6
 
   lint:
     name: Lint (${{ matrix.module }})
