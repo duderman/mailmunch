@@ -2,9 +2,9 @@ name: pulumi-preview
 
 on:
   workflow_run:
-    workflows: ["ci"]
-    types: [completed]
-    branches: ["**"]
+    workflows: [ci]
+    types:
+      - completed
 
 jobs:
   preview:
