@@ -27,7 +27,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: lambda-zip
-          path: dist/hello.zip
+          path: dist/
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
