@@ -26,19 +26,15 @@ jobs:
            github.event.workflow_run.event == 'push' &&
            github.event.workflow_run.head_branch == 'main') }}
     steps:
-      - name: Checkout (same commit as CI when applicable)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
 
       - name: Download lambda artifact from CI run
         if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: lambda-zip
-          path: dist
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist/hello.zip
 
       - name: Build Lambda artifact (manual dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -75,5 +71,5 @@ jobs:
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 concurrency:
-  group: up-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}-${{ github.event.inputs.stack || 'dev' }}
+  group: up-${{ github.event.inputs.stack || 'dev' }}
   cancel-in-progress: false
