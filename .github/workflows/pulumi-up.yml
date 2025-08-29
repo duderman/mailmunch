@@ -7,31 +7,43 @@ on:
         description: Pulumi stack name
         required: true
         default: dev
-  push:
-    branches: [ main ]
+  workflow_run:
+    workflows: [ "ci" ]
+    types: [ completed ]
 
 jobs:
-  build:
-    uses: ./.github/workflows/ci.yml
-    with:
-      run_build: true
-      run_lint: false
-
   up:
     runs-on: ubuntu-latest
-    needs: build
     permissions:
       id-token: write
       contents: read
+      actions: read
     environment: production
+    if: >
+      ${{ (github.event_name == 'workflow_dispatch') ||
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'push') }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (same commit as CI when applicable)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
 
-      - name: Download lambda artifact
+      - name: Download lambda artifact from CI run
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: lambda-zip
           path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Lambda artifact (manual dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          chmod +x scripts/build-lambda.sh
+          ./scripts/build-lambda.sh hello dist/hello.zip
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
@@ -56,8 +68,11 @@ jobs:
         uses: pulumi/actions@v5
         with:
           command: up
-          stack-name: ${{ github.event.inputs.stack }}
+          stack-name: ${{ github.event.inputs.stack || 'dev' }}
           upsert: true
           work-dir: infra
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+concurrency:
+  group: up-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}-${{ github.event.inputs.stack || 'dev' }}
+  cancel-in-progress: false

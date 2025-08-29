@@ -4,21 +4,10 @@ on:
   push:
     branches: [ main ]
   pull_request:
-  workflow_call:
-    inputs:
-      run_build:
-        description: Run build job
-        type: boolean
-        default: true
-      run_lint:
-        description: Run lint job
-        type: boolean
-        default: true
 
 jobs:
   build:
     name: Build Lambda artifact
-    if: ${{ github.event_name != 'workflow_call' || inputs.run_build }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,11 +35,14 @@ jobs:
           path: dist/hello.zip
 
   lint:
-    name: Lint (golangci-lint)
-    if: ${{ github.event_name != 'workflow_call' || inputs.run_lint }}
+    name: Lint (${{ matrix.module }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [ "infra", "lambda/hello" ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,7 +55,9 @@ jobs:
           cache-dependency-path: |
             **/go.sum
 
-      - name: Run golangci-lint
+      - name: Run golangci-lint (${{ matrix.module }})
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          working-directory: ${{ matrix.module }}
+          args: ./...
