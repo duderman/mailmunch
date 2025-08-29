@@ -16,9 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     environment: pr
-    defaults:
-      run:
-        working-directory: infra
     permissions:
       id-token: write
       contents: read
@@ -32,12 +29,15 @@ jobs:
           name: lambda-zip
           path: dist
 
-      - name: Setup Go
+      - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.x'
+          cache: true
+          cache-dependency-path: infra/go.sum
 
       - name: Build Pulumi binary
+        working-directory: infra
         run: |
           go mod tidy
           go build -o infra
@@ -53,5 +53,6 @@ jobs:
         with:
           command: preview
           stack-name: dev
+          work-dir: infra
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
