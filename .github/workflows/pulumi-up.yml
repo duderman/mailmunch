@@ -12,7 +12,10 @@ on:
 
 jobs:
   build:
-    uses: ./.github/workflows/build-lambda.yml
+    uses: ./.github/workflows/ci.yml
+    with:
+      run_build: true
+      run_lint: false
 
   up:
     runs-on: ubuntu-latest
