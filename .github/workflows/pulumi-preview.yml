@@ -2,7 +2,10 @@ name: pulumi-preview
 
 on:
   workflow_run:
-    workflows: [build]
+    workflows:
+      - build
+      - build / Build Lambda artifact
+      - Build Lambda artifact
     types:
       - completed
 
