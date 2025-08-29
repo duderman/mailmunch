@@ -13,6 +13,7 @@ jobs:
       contents: read
       pull-requests: write
       actions: read
+      attestations: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +23,6 @@ jobs:
         with:
           name: lambda-zip
           path: dist/
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
