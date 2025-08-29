@@ -26,4 +26,4 @@ pushd "$BIN_DIR" >/dev/null
 zip -q -r "../${NAME}.zip" bootstrap
 popd >/dev/null
 
-echo "Built Lambda package at $ZIP_PATH"
+echo "Built Lambda package at $DIST_DIR/${NAME}.zip"
