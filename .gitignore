@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+
+# Build artifacts
+/dist/
+**/dist/
+*.zip
+infra/infra
+
+# Pulumi
+**/.pulumi/
+**/Pulumi.*.yaml.backup
+infra/bin/
+
+# Node (if ever used)
+node_modules/
+
+# Editor
+.vscode/
+.idea/
+
+.env
