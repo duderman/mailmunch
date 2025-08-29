@@ -7,29 +7,31 @@ on:
         description: Pulumi stack name
         required: true
         default: dev
+  push:
+    branches: [ main ]
 
 jobs:
+  build:
+    uses: ./.github/workflows/build-lambda.yml
+
   up:
     runs-on: ubuntu-latest
+    needs: build
     defaults:
       run:
         working-directory: infra
     permissions:
       id-token: write
       contents: read
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Download lambda artifact
+        uses: actions/download-artifact@v4
         with:
-          go-version: '1.24.x'
-
-      - name: Build Lambda
-        run: |
-          cd ..
-          chmod +x scripts/build-lambda.sh
-          ./scripts/build-lambda.sh hello dist/hello.zip
+          name: lambda-zip
+          path: dist
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
