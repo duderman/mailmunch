@@ -8,8 +8,9 @@ on:
         required: true
         default: dev
   workflow_run:
-    workflows: [ "ci" ]
-    types: [ completed ]
+    workflows: [CI]
+    types:
+      - completed
 
 jobs:
   up:
