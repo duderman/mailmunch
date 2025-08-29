@@ -37,6 +37,8 @@ jobs:
         with:
           name: lambda-zip
           path: dist/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Build Lambda artifact (manual dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}

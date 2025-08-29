@@ -29,6 +29,8 @@ jobs:
         with:
           name: lambda-zip
           path: dist/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
