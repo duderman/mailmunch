@@ -1,0 +1,76 @@
+name: pulumi-up
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: Pulumi stack name
+        required: true
+        default: dev
+  workflow_run:
+    workflows: [CI]
+    types:
+      - completed
+
+jobs:
+  up:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    environment: production
+    if: >
+      ${{ (github.event_name == 'workflow_dispatch') ||
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_branch == 'main') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download lambda artifact from CI run
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-zip
+          path: dist/hello.zip
+
+      - name: Build Lambda artifact (manual dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          chmod +x scripts/build-lambda.sh
+          ./scripts/build-lambda.sh hello dist/hello.zip
+
+      - name: Setup Go (for Pulumi program)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: true
+          cache-dependency-path: infra/go.sum
+
+      - name: Build Pulumi binary
+        working-directory: infra
+        run: |
+          go mod tidy
+          go build -o infra
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Pulumi Up
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: ${{ github.event.inputs.stack || 'dev' }}
+          upsert: true
+          work-dir: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+concurrency:
+  group: up-${{ github.event.inputs.stack || 'dev' }}
+  cancel-in-progress: false

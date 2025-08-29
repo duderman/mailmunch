@@ -1,0 +1,61 @@
+name: pulumi-preview
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types:
+      - completed
+
+jobs:
+  preview:
+    name: Pulumi preview
+    runs-on: ubuntu-latest
+    environment: pr
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      actions: read
+    if: >
+      ${{ github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download lambda artifact from CI run
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-zip
+          path: dist/hello.zip
+
+      - name: Setup Go (for Pulumi program)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: true
+          cache-dependency-path: infra/go.sum
+
+      - name: Build Pulumi binary
+        working-directory: infra
+        run: |
+          go mod tidy
+          go build -o infra
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Pulumi preview
+        uses: pulumi/actions@v5
+        with:
+          command: preview
+          stack-name: dev
+          work-dir: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+concurrency:
+  group: preview-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
