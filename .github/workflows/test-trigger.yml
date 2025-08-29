@@ -1,0 +1,15 @@
+name: Test trigger
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types:
+      - completed
+
+jobs:
+  test_trigger:
+    name: Test workflow trigger
+    runs-on: ubuntu-latest
+    steps:
+      - name: Just echo
+        run: echo "Hello, world!"
