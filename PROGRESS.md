@@ -7,3 +7,5 @@
 ~~configure pulumi preview on branches and pulumi up on main~~
 
 ~~workflow_run triggers pulumi in main not on branch~~
+
+preview cant see artifact from build. probably pulumi-up as well
