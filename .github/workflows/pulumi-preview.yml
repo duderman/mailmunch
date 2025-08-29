@@ -2,8 +2,9 @@ name: pulumi-preview
 
 on:
   workflow_run:
-    workflows: [ "ci" ]
-    types: [ completed ]
+    workflows: ["ci"]
+    types: [completed]
+    branches: ["**"]
 
 jobs:
   preview:
@@ -19,7 +20,7 @@ jobs:
       ${{ github.event.workflow_run.event == 'pull_request' &&
           github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Checkout (same commit as CI)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
