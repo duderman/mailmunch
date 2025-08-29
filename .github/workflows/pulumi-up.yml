@@ -8,7 +8,7 @@ on:
         required: true
         default: dev
   workflow_run:
-    workflows: [CI]
+    workflows: [build]
     types:
       - completed
 

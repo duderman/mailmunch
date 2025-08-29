@@ -2,7 +2,7 @@ name: pulumi-preview
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [build]
     types:
       - completed
 
