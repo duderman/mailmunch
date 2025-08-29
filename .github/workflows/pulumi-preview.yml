@@ -29,6 +29,16 @@ jobs:
           name: lambda-zip
           path: dist
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build Pulumi binary
+        run: |
+          go mod tidy
+          go build -o infra
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

@@ -33,11 +33,21 @@ jobs:
           name: lambda-zip
           path: dist
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build Pulumi binary
+        run: |
+          go mod tidy
+          go build -o infra
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Pulumi Up
         uses: pulumi/actions@v5
