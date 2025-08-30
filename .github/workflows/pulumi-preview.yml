@@ -18,42 +18,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve build run id for this PR
-        id: resolve_run
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          api="https://api.github.com/repos/${REPO}/actions/workflows/build.yml/runs?event=pull_request&status=success&per_page=50"
-          for i in $(seq 1 30); do
-            json=$(curl -sSf -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$api")
-            run_id=$(echo "$json" | jq -r --argjson pr "$PR_NUMBER" '.workflow_runs | map(select(any(.pull_requests[]?; .number == $pr))) | first | .id')
-            if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-              run_id=$(echo "$json" | jq -r --arg sha "$PR_HEAD_SHA" '.workflow_runs | map(select(.head_sha == $sha)) | first | .id')
-            fi
-            if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
-              echo "Found build run id: $run_id"
-              break
-            fi
-            echo "Waiting for build workflow run to complete... ($i)" >&2
-            sleep 10
-          done
-          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-            echo "Could not find successful build run for this PR ($PR_NUMBER) / head sha $PR_HEAD_SHA" >&2
-            exit 1
-          fi
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-
       - name: Download lambda artifact from build workflow
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v11
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build.yml
+          pr: ${{ github.event.number }}
           name: lambda-zip
           path: dist/
-          run-id: ${{ steps.resolve_run.outputs.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          if_no_artifact_found: fail
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
