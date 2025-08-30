@@ -1,11 +1,7 @@
 name: pulumi-preview
 
 on:
-  workflow_run:
-    workflows:
-      - build
-    types:
-      - completed
+  pull_request:
 
 jobs:
   preview:
@@ -17,18 +13,20 @@ jobs:
       contents: read
       pull-requests: write
       actions: read
-    if: >
-      ${{ github.event.workflow_run.event == 'pull_request' &&
-          github.event.workflow_run.conclusion == 'success' }}
+      attestations: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download lambda artifact from CI run
-        uses: actions/download-artifact@v4
+      - name: Download lambda artifact from build workflow
+        uses: dawidd6/action-download-artifact@v11
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build.yml
+          pr: ${{ github.event.number }}
           name: lambda-zip
           path: dist/
+          if_no_artifact_found: fail
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
@@ -58,5 +56,5 @@ jobs:
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 concurrency:
-  group: preview-${{ github.event.workflow_run.id }}
+  group: preview-${{ github.event.number }}
   cancel-in-progress: true

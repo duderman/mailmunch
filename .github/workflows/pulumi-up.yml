@@ -7,11 +7,17 @@ on:
         description: Pulumi stack name
         required: true
         default: dev
+      ref:
+        description: Git ref (branch or commit SHA) to deploy
+        required: false
+        default: main
   workflow_run:
     workflows:
       - build
     types:
       - completed
+    branches:
+      - main
 
 jobs:
   up:
@@ -20,29 +26,41 @@ jobs:
       id-token: write
       contents: read
       actions: read
+      attestations: read
     environment: production
     if: >
       ${{ (github.event_name == 'workflow_dispatch') ||
-          (github.event_name == 'workflow_run' &&
-           github.event.workflow_run.conclusion == 'success' &&
-           github.event.workflow_run.event == 'push' &&
-           github.event.workflow_run.head_branch == 'main') }}
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     steps:
-      - name: Checkout
+      - name: Checkout (same commit as build when applicable)
         uses: actions/checkout@v4
-
-      - name: Download lambda artifact from CI run
-        if: ${{ github.event_name == 'workflow_run' }}
-        uses: actions/download-artifact@v4
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event.inputs.ref }}
+
+      - name: Download lambda artifact from build workflow
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: dawidd6/action-download-artifact@v11
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build.yml
+          event: push
+          commit: ${{ github.event.workflow_run.head_sha }}
           name: lambda-zip
           path: dist/
+          if_no_artifact_found: fail
 
-      - name: Build Lambda artifact (manual dispatch)
+      - name: Download lambda artifact for manual ref
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          chmod +x scripts/build-lambda.sh
-          ./scripts/build-lambda.sh hello dist/hello.zip
+        uses: dawidd6/action-download-artifact@v11
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build.yml
+          name: lambda-zip
+          path: dist/
+          # Try to match either by commit or branch name
+          commit: ${{ github.event.inputs.ref }}
+          branch: ${{ github.event.inputs.ref }}
+          if_no_artifact_found: fail
 
       - name: Setup Go (for Pulumi program)
         uses: actions/setup-go@v5
