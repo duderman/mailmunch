@@ -17,8 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         module:
-          - "lambda/email_ingest"
-          - "lambda/loseit_transform"
+          - email_ingest
+          - loseit_transform
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,11 +32,11 @@ jobs:
             **/go.sum
 
       - name: Download dependencies
-        working-directory: ${{ matrix.module }}
+        working-directory: lambda/${{ matrix.module }}
         run: go mod download
 
       - name: Run tests with coverage
-        working-directory: ${{ matrix.module }}
+        working-directory: lambda/${{ matrix.module }}
         run: |
           go test -v -race -coverprofile=coverage.out ./...
           go tool cover -html=coverage.out -o coverage.html
@@ -45,4 +45,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.module }}-${{ github.sha }}
-          path: ${{ matrix.module }}/coverage.*
+          path: lambda/${{ matrix.module }}/coverage.*
