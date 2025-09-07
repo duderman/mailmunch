@@ -438,11 +438,6 @@ func main() {
 				return err
 			}
 
-			// Optionally create a v2 identity for the recipient's domain/email to aid verification
-			if id, ok := ctx.GetConfig("mailmunch:sesEmailIdentity"); ok && id != "" {
-				// already created above if provided; nothing to do
-			}
-
 			ctx.Export("sesRecipient", pulumi.String(recipient))
 			ctx.Export("sesRuleSet", ruleSet.RuleSetName)
 		}

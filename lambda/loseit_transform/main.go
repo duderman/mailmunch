@@ -96,7 +96,9 @@ func handler(ctx context.Context, evt events.S3Event) error {
 			return fmt.Errorf("s3 get %s/%s: %w", b, key, err)
 		}
 		body, err := io.ReadAll(obj.Body)
-		obj.Body.Close()
+		if closeErr := obj.Body.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close object body: %w", closeErr)
+		}
 		if err != nil {
 			return err
 		}
