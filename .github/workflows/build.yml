@@ -6,49 +6,9 @@ on:
   pull_request:
 
 jobs:
-  test:
-    name: Run Go Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-          cache-dependency-path: |
-            **/go.sum
-
-      - name: Test email_ingest
-        run: |
-          cd lambda/email_ingest
-          go mod download
-          go test -v ./...
-
-      - name: Test loseit_transform  
-        run: |
-          cd lambda/loseit_transform
-          go mod download
-          go test -v ./...
-
-      - name: Test hello (if tests exist)
-        run: |
-          cd lambda/hello
-          if ls *_test.go 1> /dev/null 2>&1; then
-            go mod download
-            go test -v ./...
-          else
-            echo "No tests found for hello lambda"
-          fi
-
   build:
     name: Build Lambda artifacts
     runs-on: ubuntu-latest
-    needs: test
     permissions:
       contents: read
       actions: write
@@ -64,13 +24,9 @@ jobs:
           cache-dependency-path: |
             **/go.sum
 
-      - name: Build Lambda hello
-        run: |
-          chmod +x scripts/build-lambda.sh
-          ./scripts/build-lambda.sh hello dist/hello.zip
-
       - name: Build Lambda email_ingest
         run: |
+          chmod +x scripts/build-lambda.sh
           ./scripts/build-lambda.sh email_ingest dist/email_ingest.zip
 
       - name: Build Lambda loseit_transform

@@ -4,16 +4,15 @@ GOOS ?= linux
 GOARCH ?= arm64
 CGO_ENABLED ?= 0
 
-LAMBDA_NAME := hello
 DIST := dist
-LAMBDA_ZIP := $(DIST)/hello.zip
 EMAIL_INGEST_ZIP := $(DIST)/email_ingest.zip
+LOSEIT_TRANSFORM_ZIP := $(DIST)/loseit_transform.zip
 
-.PHONY: all build-all tidy tidy-lambdas lambda lambda-email lambda-transform test test-coverage infra-preview infra-up clean
+.PHONY: all build-all tidy tidy-lambdas lambda-email lambda-transform test test-coverage infra-preview infra-up clean
 
 all: build-all
 
-build-all: tidy lambda
+build-all: tidy lambda-email lambda-transform
 
 tidy:
 	go mod tidy
@@ -23,14 +22,11 @@ tidy-lambdas:
 	cd lambda/email_ingest && go mod tidy
 	cd lambda/loseit_transform && go mod tidy
 
-lambda:
-	./scripts/build-lambda.sh $(LAMBDA_NAME) $(LAMBDA_ZIP)
-
 lambda-email:
 	./scripts/build-lambda.sh email_ingest $(EMAIL_INGEST_ZIP)
 
 lambda-transform:
-	./scripts/build-lambda.sh loseit_transform $(DIST)/loseit_transform.zip
+	./scripts/build-lambda.sh loseit_transform $(LOSEIT_TRANSFORM_ZIP)
 
 test:
 	$(MAKE) tidy-lambdas

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAME="${1:-hello}"
-ZIP_PATH="${2:-dist/hello.zip}"
+NAME="${1:-email_ingest}"
+ZIP_PATH="${2:-dist/email_ingest.zip}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SRC_DIR="$ROOT_DIR/lambda/$NAME"

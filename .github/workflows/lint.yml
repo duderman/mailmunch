@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [ "infra", "lambda/hello", "lambda/email_ingest", "lambda/loseit_transform" ]
+        module: [ "infra", "lambda/email_ingest", "lambda/loseit_transform" ]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5

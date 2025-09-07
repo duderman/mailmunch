@@ -22,7 +22,12 @@ import (
 	"github.com/parquet-go/parquet-go/compress/snappy"
 )
 
-func envOr(k, def string) string { if v := os.Getenv(k); v != "" { return v }; return def }
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
 
 // s3API defines the subset of S3 methods used, to enable mocking in tests.
 type s3API interface {
@@ -59,16 +64,20 @@ type LoseItLog struct {
 func main() { lambda.Start(handler) }
 
 func handler(ctx context.Context, evt events.S3Event) error {
-    bucketName := os.Getenv("DATA_BUCKET")
-    if bucketName == "" { return fmt.Errorf("DATA_BUCKET env var is required") }
-    
-    rawCsvBase := envOr("RAW_CSV_BASE", "raw/loseit_csv/")
-    curatedBase := envOr("CURATED_BASE", "curated/loseit_parquet/")
-    
-    s3c, err := newS3Client(ctx)
-    if err != nil { return err }
+	bucketName := os.Getenv("DATA_BUCKET")
+	if bucketName == "" {
+		return fmt.Errorf("DATA_BUCKET env var is required")
+	}
 
-    for _, rec := range evt.Records {
+	rawCsvBase := envOr("RAW_CSV_BASE", "raw/loseit_csv/")
+	curatedBase := envOr("CURATED_BASE", "curated/loseit_parquet/")
+
+	s3c, err := newS3Client(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, rec := range evt.Records {
 		b := rec.S3.Bucket.Name
 		key := rec.S3.Object.Key
 		if !strings.HasPrefix(key, rawCsvBase) {

@@ -161,26 +161,6 @@ func main() {
 			}
 		}
 
-		// Package path for Lambda code
-		lambdaZip := pulumi.NewFileArchive("../dist/hello.zip")
-
-        fn, err := lambda.NewFunction(ctx, fmt.Sprintf("%s-%s-hello", project, stack), &lambda.FunctionArgs{
-            Role:          role.Arn,
-            Runtime:       pulumi.String("provided.al2"),
-            Handler:       pulumi.String("bootstrap"),
-            Architectures: pulumi.ToStringArray([]string{"arm64"}),
-            Code:          lambdaZip,
-            Environment: &lambda.FunctionEnvironmentArgs{
-                Variables: pulumi.StringMap{
-                    "SECRET_ARN": secret.Arn,
-                    "BUCKET":     bucket.Bucket,
-                },
-            },
-        }, awsOpts)
-        if err != nil {
-            return err
-        }
-
         // Lambda that parses incoming EML and writes raw + CSV to partitioned prefixes
         ingestRole, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-email-ingest-role", project, stack), &iam.RoleArgs{
             AssumeRolePolicy: pulumi.String(`{
@@ -266,10 +246,8 @@ func main() {
         ctx.Export("dataBucket", emailsBucket.Bucket)
         ctx.Export("ecrRepositoryUrl", repo.RepositoryUrl)
         ctx.Export("secretArn", secret.Arn)
-        ctx.Export("lambdaName", fn.Name)
         ctx.Export("emailIngestLambda", emailIngestFn.Name)
         ctx.Export("region", aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name())
-        ctx.Export("transformLambda", transformFn.Name)
         if v, ok := ctx.GetConfig("mailmunch:sesEmailIdentity"); ok {
             ctx.Export("sesEmailIdentity", pulumi.String(v))
         }
@@ -365,6 +343,8 @@ func main() {
         }, awsOpts)
         if err != nil { return err }
 
+        ctx.Export("transformLambda", transformFn.Name)
+
         _, err = lambda.NewPermission(ctx, fmt.Sprintf("%s-%s-transform-perm", project, stack), &lambda.PermissionArgs{
             Action:    pulumi.String("lambda:InvokeFunction"),
             Function:  transformFn.Name,
@@ -399,12 +379,12 @@ func main() {
 
             // Activate the rule set
             _, err = ses.NewActiveReceiptRuleSet(ctx, fmt.Sprintf("%s-%s-receipt-active", project, stack), &ses.ActiveReceiptRuleSetArgs{
-                RuleSetName: ruleSet.Name,
+                RuleSetName: ruleSet.RuleSetName,
             }, awsOpts)
             if err != nil { return err }
 
             _, err = ses.NewReceiptRule(ctx, fmt.Sprintf("%s-%s-receipt-rule", project, stack), &ses.ReceiptRuleArgs{
-                RuleSetName: ruleSet.Name,
+                RuleSetName: ruleSet.RuleSetName,
                 Recipients:  pulumi.ToStringArray([]string{recipient}),
                 Enabled:     pulumi.Bool(true),
                 ScanEnabled: pulumi.Bool(true),
@@ -424,7 +404,7 @@ func main() {
             }
 
             ctx.Export("sesRecipient", pulumi.String(recipient))
-            ctx.Export("sesRuleSet", ruleSet.Name)
+            ctx.Export("sesRuleSet", ruleSet.RuleSetName)
         }
         return nil
     })

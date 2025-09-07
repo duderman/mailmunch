@@ -23,7 +23,6 @@ And includes:
 
 ## Layout
 
-- `lambda/hello`: Go Lambda "hello world" handler
 - `lambda/email_ingest`: Email processing Lambda for extracting CSV attachments
 - `lambda/loseit_transform`: Data transformation Lambda for converting CSV to Parquet
 - `infra`: Pulumi Go program
@@ -68,17 +67,16 @@ make test-coverage
 1. Build lambda zips
 
 ```bash
-make lambda          # builds hello lambda
-make lambda-email    # builds email_ingest lambda  
+make lambda-email    # builds email_ingest lambda
 make lambda-transform # builds loseit_transform lambda
 ```
 
 ### Deployment
 
-1. Build lambda zip
+1. Build lambda zips
 
 ```bash
-make lambda
+make build-all
 ```
 
 1. Configure Pulumi stack
@@ -111,5 +109,5 @@ Set GitHub secrets if using OIDC deploys:
 
 ## Notes
 
-- The hello Lambda uses custom runtime `provided.al2`. The build script produces a `bootstrap` binary in the zip.
+- All Lambda functions use custom runtime `provided.al2`. The build script produces a `bootstrap` binary in the zip.
 - SES is referenced implicitly (no resources created by default) to avoid requiring domain verification upfront. Add identities/routes later as needed.
