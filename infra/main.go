@@ -108,45 +108,25 @@ func main() {
 			return err
 		}
 
-		role, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-lambda-role", project, stack), &iam.RoleArgs{
-			AssumeRolePolicy: pulumi.String(`{
-			  "Version": "2012-10-17",
-			  "Statement": [
-			    {
-			      "Action": "sts:AssumeRole",
-			      "Principal": {
-			        "Service": "lambda.amazonaws.com"
-			      },
-			      "Effect": "Allow",
-			      "Sid": ""
-			    }
-			  ]
-			}`),
-		}, awsOpts)
-		if err != nil {
-			return err
-		}
-		_, err = iam.NewRolePolicyAttachment(ctx, fmt.Sprintf("%s-%s-lambda-basic", project, stack), &iam.RolePolicyAttachmentArgs{
-			Role:      role.Name,
-			PolicyArn: pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
-		}, awsOpts)
-		if err != nil {
-			return err
-		}
-
-		// Allow reading secrets and appconfig
-		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-lambda-inline", project, stack), &iam.RolePolicyArgs{
-			Role: role.ID(),
-			Policy: secret.Arn.ApplyT(func(arn string) string {
-				return fmt.Sprintf(`{
-		  "Version": "2012-10-17",
-		  "Statement": [
-			{"Effect":"Allow","Action":["secretsmanager:GetSecretValue"],"Resource":"%s"},
-			{"Effect":"Allow","Action":["appconfig:GetConfiguration*","appconfig:StartConfigurationSession"],"Resource":"*"}
-		  ]
-		}`, arn)
-			}).(pulumi.StringOutput),
-		}, awsOpts)
+		// Lambda assume role policy
+		lambdaAssumeRolePolicy, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
+			Statements: []iam.GetPolicyDocumentStatement{
+				{
+					Effect: pulumi.StringRef("Allow"),
+					Principals: []iam.GetPolicyDocumentStatementPrincipal{
+						{
+							Type: "Service",
+							Identifiers: []string{
+								"lambda.amazonaws.com",
+							},
+						},
+					},
+					Actions: []string{
+						"sts:AssumeRole",
+					},
+				},
+			},
+		}, nil)
 		if err != nil {
 			return err
 		}
@@ -163,12 +143,7 @@ func main() {
 
 		// Lambda that parses incoming EML and writes raw + CSV to partitioned prefixes
 		ingestRole, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-email-ingest-role", project, stack), &iam.RoleArgs{
-			AssumeRolePolicy: pulumi.String(`{
-              "Version": "2012-10-17",
-              "Statement": [{
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "lambda.amazonaws.com"},
-                "Effect": "Allow","Sid": ""}]}`),
+			AssumeRolePolicy: pulumi.String(lambdaAssumeRolePolicy.Json),
 		}, awsOpts)
 		if err != nil {
 			return err
@@ -183,14 +158,29 @@ func main() {
 		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-email-ingest-s3", project, stack), &iam.RolePolicyArgs{
 			Role: ingestRole.ID(),
 			Policy: emailsBucket.Arn.ApplyT(func(arn string) string {
-				// Allow get/list/put/delete on emails bucket
-				return fmt.Sprintf(`{
-  "Version":"2012-10-17",
-  "Statement":[
-    {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":"%s/*"},
-    {"Effect":"Allow","Action":["s3:ListBucket"],"Resource":"%s"}
-  ]
-}`, arn, arn)
+				policyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
+					Statements: []iam.GetPolicyDocumentStatement{
+						{
+							Effect: pulumi.StringRef("Allow"),
+							Actions: []string{
+								"s3:GetObject",
+								"s3:PutObject",
+							},
+							Resources: []string{arn + "/*"},
+						},
+						{
+							Effect: pulumi.StringRef("Allow"),
+							Actions: []string{
+								"s3:ListBucket",
+							},
+							Resources: []string{arn},
+						},
+					},
+				}, nil)
+				if err != nil {
+					panic(err)
+				}
+				return policyDoc.Json
 			}).(pulumi.StringOutput),
 		}, awsOpts)
 		if err != nil {
@@ -237,17 +227,38 @@ func main() {
 			Policy: pulumi.All(emailsBucket.Arn, caller.AccountId()).ApplyT(func(vals []interface{}) string {
 				arn := vals[0].(string)
 				acct := vals[1].(string)
-				return fmt.Sprintf(`{
-  "Version": "2008-10-17",
-  "Statement": [{
-    "Sid": "AllowSESPuts",
-    "Effect": "Allow",
-    "Principal": {"Service": "ses.amazonaws.com"},
-    "Action": "s3:PutObject",
-    "Resource": "%s/*",
-    "Condition": {"StringEquals": {"aws:Referer": "%s"}}
-  }]
-}`, arn, acct)
+				policyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
+					Version: pulumi.StringRef("2008-10-17"), // SES bucket policies use this older version
+					Statements: []iam.GetPolicyDocumentStatement{
+						{
+							Sid:    pulumi.StringRef("AllowSESPuts"),
+							Effect: pulumi.StringRef("Allow"),
+							Principals: []iam.GetPolicyDocumentStatementPrincipal{
+								{
+									Type: "Service",
+									Identifiers: []string{
+										"ses.amazonaws.com",
+									},
+								},
+							},
+							Actions: []string{
+								"s3:PutObject",
+							},
+							Resources: []string{arn + "/*"},
+							Conditions: []iam.GetPolicyDocumentStatementCondition{
+								{
+									Test:     "StringEquals",
+									Variable: "aws:Referer",
+									Values:   []string{acct},
+								},
+							},
+						},
+					},
+				}, nil)
+				if err != nil {
+					panic(err)
+				}
+				return policyDoc.Json
 			}).(pulumi.StringOutput),
 		}, awsOpts)
 		if err != nil {
@@ -272,14 +283,31 @@ func main() {
 			return err
 		}
 
+		// Glue assume role policy
+		glueAssumeRolePolicy, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
+			Statements: []iam.GetPolicyDocumentStatement{
+				{
+					Effect: pulumi.StringRef("Allow"),
+					Principals: []iam.GetPolicyDocumentStatementPrincipal{
+						{
+							Type: "Service",
+							Identifiers: []string{
+								"glue.amazonaws.com",
+							},
+						},
+					},
+					Actions: []string{
+						"sts:AssumeRole",
+					},
+				},
+			},
+		}, nil)
+		if err != nil {
+			return err
+		}
+
 		glueRole, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-glue-role", project, stack), &iam.RoleArgs{
-			AssumeRolePolicy: pulumi.String(`{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Action": "sts:AssumeRole",
-    "Principal": {"Service": "glue.amazonaws.com"},
-    "Effect": "Allow","Sid": ""}]
-}`),
+			AssumeRolePolicy: pulumi.String(glueAssumeRolePolicy.Json),
 		}, awsOpts)
 		if err != nil {
 			return err
@@ -294,13 +322,35 @@ func main() {
 		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-glue-s3", project, stack), &iam.RolePolicyArgs{
 			Role: glueRole.ID(),
 			Policy: emailsBucket.Arn.ApplyT(func(arn string) string {
-				return fmt.Sprintf(`{
-  "Version":"2012-10-17",
-  "Statement":[
-    {"Effect":"Allow","Action":["s3:GetObject"],"Resource":"%s/curated/*"},
-    {"Effect":"Allow","Action":["s3:ListBucket"],"Resource":"%s","Condition":{"StringLike":{"s3:prefix":["curated/*"]}}}
-  ]
-}`, arn, arn)
+				policyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
+					Statements: []iam.GetPolicyDocumentStatement{
+						{
+							Effect: pulumi.StringRef("Allow"),
+							Actions: []string{
+								"s3:GetObject",
+							},
+							Resources: []string{arn + "/curated/*"},
+						},
+						{
+							Effect: pulumi.StringRef("Allow"),
+							Actions: []string{
+								"s3:ListBucket",
+							},
+							Resources: []string{arn},
+							Conditions: []iam.GetPolicyDocumentStatementCondition{
+								{
+									Test:     "StringLike",
+									Variable: "s3:prefix",
+									Values:   []string{"curated/*"},
+								},
+							},
+						},
+					},
+				}, nil)
+				if err != nil {
+					panic(err)
+				}
+				return policyDoc.Json
 			}).(pulumi.StringOutput),
 		}, awsOpts)
 		if err != nil {
@@ -321,12 +371,7 @@ func main() {
 
 		// Transform Lambda: CSV -> Parquet (Snappy)
 		transformRole, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-transform-role", project, stack), &iam.RoleArgs{
-			AssumeRolePolicy: pulumi.String(`{
-              "Version": "2012-10-17",
-              "Statement": [{
-                "Action": "sts:AssumeRole",
-                "Principal": {"Service": "lambda.amazonaws.com"},
-                "Effect": "Allow","Sid": ""}]}`),
+			AssumeRolePolicy: pulumi.String(lambdaAssumeRolePolicy.Json),
 		}, awsOpts)
 		if err != nil {
 			return err
@@ -341,13 +386,29 @@ func main() {
 		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-transform-s3", project, stack), &iam.RolePolicyArgs{
 			Role: transformRole.ID(),
 			Policy: emailsBucket.Arn.ApplyT(func(arn string) string {
-				return fmt.Sprintf(`{
-  "Version":"2012-10-17",
-  "Statement":[
-    {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":"%s/*"},
-    {"Effect":"Allow","Action":["s3:ListBucket"],"Resource":"%s"}
-  ]
-}`, arn, arn)
+				policyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
+					Statements: []iam.GetPolicyDocumentStatement{
+						{
+							Effect: pulumi.StringRef("Allow"),
+							Actions: []string{
+								"s3:GetObject",
+								"s3:PutObject",
+							},
+							Resources: []string{arn + "/*"},
+						},
+						{
+							Effect: pulumi.StringRef("Allow"),
+							Actions: []string{
+								"s3:ListBucket",
+							},
+							Resources: []string{arn},
+						},
+					},
+				}, nil)
+				if err != nil {
+					panic(err)
+				}
+				return policyDoc.Json
 			}).(pulumi.StringOutput),
 		}, awsOpts)
 		if err != nil {
