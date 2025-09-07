@@ -8,4 +8,6 @@
 
 ~~workflow_run triggers pulumi in main not on branch~~
 
-preview cant see artifact from build. probably pulumi-up as well
+~~preview cant see artifact from build. probably pulumi-up as well~~
+
+set up email domain and configure it for ses
