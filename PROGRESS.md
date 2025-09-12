@@ -11,3 +11,5 @@
 ~~preview cant see artifact from build. probably pulumi-up as well~~
 
 set up email domain and configure it for ses
+
+bought mailmunch.co.uk but i dont think it works. ses wont verify it
