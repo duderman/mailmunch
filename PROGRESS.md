@@ -12,4 +12,4 @@
 
 set up email domain and configure it for ses
 
-bought mailmunch.co.uk but i dont think it works. ses wont verify it
+bought mailmunch.co.uk (squarespace -> cloudflare registrar) but i dont think it works. ses wont verify it
