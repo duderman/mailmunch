@@ -56,6 +56,13 @@ func main() {
 		if v, ok := ctx.GetConfig("mailmunch:dataBucketName"); ok && v != "" {
 			dataBucketName = v
 		}
+
+		// Allowed sender domain for email filtering (configurable; default "loseit.com")
+		allowedSenderDomain := "loseit.com"
+		if v, ok := ctx.GetConfig("mailmunch:allowedSenderDomain"); ok && v != "" {
+			allowedSenderDomain = v
+		}
+
 		emailsBucket, err := s3.NewBucket(ctx, dataBucketName, &s3.BucketArgs{
 			Bucket: pulumi.String(dataBucketName),
 		}, awsOpts)
@@ -165,6 +172,7 @@ func main() {
 							Actions: []string{
 								"s3:GetObject",
 								"s3:PutObject",
+								"s3:DeleteObject",
 							},
 							Resources: []string{arn + "/*"},
 						},
@@ -196,10 +204,11 @@ func main() {
 			Code:          emailIngestZip,
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
-					"EMAIL_BUCKET":    emailsBucket.Bucket,
-					"INCOMING_PREFIX": pulumi.String("raw/email/incoming/"),
-					"RAW_EMAIL_BASE":  pulumi.String("raw/email/"),
-					"RAW_CSV_BASE":    pulumi.String("raw/loseit_csv/"),
+					"EMAIL_BUCKET":          emailsBucket.Bucket,
+					"INCOMING_PREFIX":       pulumi.String("raw/email/incoming/"),
+					"RAW_EMAIL_BASE":        pulumi.String("raw/email/"),
+					"RAW_CSV_BASE":          pulumi.String("raw/loseit_csv/"),
+					"ALLOWED_SENDER_DOMAIN": pulumi.String(allowedSenderDomain),
 				},
 			},
 		}, awsOpts)
@@ -271,6 +280,7 @@ func main() {
 		ctx.Export("secretArn", secret.Arn)
 		ctx.Export("emailIngestLambda", emailIngestFn.Name)
 		ctx.Export("region", aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name())
+		ctx.Export("allowedSenderDomain", pulumi.String(allowedSenderDomain))
 		if v, ok := ctx.GetConfig("mailmunch:sesEmailIdentity"); ok {
 			ctx.Export("sesEmailIdentity", pulumi.String(v))
 		}
