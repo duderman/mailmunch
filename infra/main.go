@@ -281,6 +281,7 @@ func main() {
 		ctx.Export("emailIngestLambda", emailIngestFn.Name)
 		ctx.Export("region", aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name())
 		ctx.Export("allowedSenderDomain", pulumi.String(allowedSenderDomain))
+
 		if v, ok := ctx.GetConfig("mailmunch:sesEmailIdentity"); ok {
 			ctx.Export("sesEmailIdentity", pulumi.String(v))
 		}
