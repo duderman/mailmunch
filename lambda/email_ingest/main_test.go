@@ -105,10 +105,6 @@ func (m *mockS3) PutObject(ctx context.Context, in *s3.PutObjectInput, _ ...func
 	m.puts = append(m.puts, putCall{Key: aws.ToString(in.Key), Body: b, ContentType: ct})
 	return &s3.PutObjectOutput{}, nil
 }
-func (m *mockS3) DeleteObject(ctx context.Context, in *s3.DeleteObjectInput, _ ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
-	// Mock implementation - just return success
-	return &s3.DeleteObjectOutput{}, nil
-}
 func (m *mockS3) HeadObject(ctx context.Context, in *s3.HeadObjectInput, _ ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
 	// Simulate not found so ensureUniqueKey uses the initial name
 	return nil, fmt.Errorf("not found")

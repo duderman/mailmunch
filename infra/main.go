@@ -80,6 +80,26 @@ func main() {
 			return err
 		}
 
+		// S3 lifecycle rules for email retention
+		_, err = s3.NewBucketLifecycleConfigurationV2(ctx, fmt.Sprintf("%s-%s-emails-lifecycle", project, stack), &s3.BucketLifecycleConfigurationV2Args{
+			Bucket: emailsBucket.ID(),
+			Rules: s3.BucketLifecycleConfigurationV2RuleArray{
+				&s3.BucketLifecycleConfigurationV2RuleArgs{
+					Id:     pulumi.String("expire-raw-incoming-emails"),
+					Status: pulumi.String("Enabled"),
+					Filter: &s3.BucketLifecycleConfigurationV2RuleFilterArgs{
+						Prefix: pulumi.String("raw/email/incoming/"),
+					},
+					Expiration: &s3.BucketLifecycleConfigurationV2RuleExpirationArgs{
+						Days: pulumi.Int(90), // Expire raw incoming emails after 90 days
+					},
+				},
+			},
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
 		repo, err := ecr.NewRepository(ctx, fmt.Sprintf("%s-%s-repo", project, stack), &ecr.RepositoryArgs{
 			ImageScanningConfiguration: &ecr.RepositoryImageScanningConfigurationArgs{
 				ScanOnPush: pulumi.Bool(true),
@@ -172,7 +192,6 @@ func main() {
 							Actions: []string{
 								"s3:GetObject",
 								"s3:PutObject",
-								"s3:DeleteObject",
 							},
 							Resources: []string{arn + "/*"},
 						},
@@ -457,7 +476,7 @@ func main() {
 			return err
 		}
 
-		// Single S3 BucketNotification with two Lambda triggers
+		// S3 BucketNotification with both email ingest and transform Lambda triggers
 		_, err = s3.NewBucketNotification(ctx, fmt.Sprintf("%s-%s-data-notify", project, stack), &s3.BucketNotificationArgs{
 			Bucket: emailsBucket.ID(),
 			LambdaFunctions: s3.BucketNotificationLambdaFunctionArray{

@@ -29,7 +29,6 @@ type s3API interface {
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 	HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
-	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 }
 
 var newS3Client = func(ctx context.Context) (s3API, error) {
@@ -57,8 +56,6 @@ func handler(ctx context.Context, evt events.S3Event) error {
 		return fmt.Errorf("EMAIL_BUCKET env var is required")
 	}
 	incomingPrefix := envOr("INCOMING_PREFIX", "raw/email/incoming/")
-	rawEmailBase := envOr("RAW_EMAIL_BASE", "raw/email/")
-	rawCsvBase := envOr("RAW_CSV_BASE", "raw/loseit_csv/")
 
 	s3c, err := newS3Client(ctx)
 	if err != nil {
@@ -77,130 +74,124 @@ func handler(ctx context.Context, evt events.S3Event) error {
 			continue
 		}
 
-		// Fetch the raw EML
-		obj, err := s3c.GetObject(ctx, &s3.GetObjectInput{Bucket: &b, Key: &k})
-		if err != nil {
-			return fmt.Errorf("s3 get %s/%s: %w", b, k, err)
+		if err := processEmail(ctx, s3c, b, k); err != nil {
+			log.Printf("error processing email %s/%s: %v", b, k, err)
+			// Continue processing other emails rather than failing the entire batch
 		}
-		rawBytes, err := io.ReadAll(obj.Body)
-		if err != nil {
-			return fmt.Errorf("read s3 object: %w", err)
-		}
-		_ = obj.Body.Close()
-
-		// Parse headers for Message-ID and Date
-		msg, _ := mail.ReadMessage(bytes.NewReader(rawBytes))
-
-		// Check if email is from allowed domain (loseit.com)
-		allowedDomain := envOr("ALLOWED_SENDER_DOMAIN", "loseit.com")
-
-		if allowedDomain != "" {
-			fromHeader := msg.Header.Get("From")
-			if fromHeader == "" {
-				log.Printf("warn: no From header found, deleting email from S3")
-				if _, err := s3c.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &b, Key: &k}); err != nil {
-					log.Printf("error: failed to delete email %s/%s: %v", b, k, err)
-				} else {
-					log.Printf("info: deleted email %s/%s (no From header)", b, k)
-				}
-				continue
-			}
-
-			// Parse email address to extract domain
-			fromAddr, err := mail.ParseAddress(fromHeader)
-			if err != nil {
-				log.Printf("warn: failed to parse From address '%s': %v, deleting email", fromHeader, err)
-				if _, err := s3c.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &b, Key: &k}); err != nil {
-					log.Printf("error: failed to delete email %s/%s: %v", b, k, err)
-				} else {
-					log.Printf("info: deleted email %s/%s (invalid From header)", b, k)
-				}
-				continue
-			}
-
-			// Extract domain from email address
-			parts := strings.Split(fromAddr.Address, "@")
-			if len(parts) != 2 {
-				log.Printf("warn: invalid email format '%s', deleting email", fromAddr.Address)
-				if _, err := s3c.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &b, Key: &k}); err != nil {
-					log.Printf("error: failed to delete email %s/%s: %v", b, k, err)
-				} else {
-					log.Printf("info: deleted email %s/%s (invalid email format)", b, k)
-				}
-				continue
-			}
-			senderDomain := strings.ToLower(parts[1])
-
-			if senderDomain != strings.ToLower(allowedDomain) {
-				log.Printf("info: email from domain '%s' not allowed (expected '%s'), deleting email", senderDomain, allowedDomain)
-				if _, err := s3c.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &b, Key: &k}); err != nil {
-					log.Printf("error: failed to delete email %s/%s: %v", b, k, err)
-				} else {
-					log.Printf("info: deleted email %s/%s from unauthorized domain '%s'", b, k, senderDomain)
-				}
-				continue
-			}
-			log.Printf("info: email from allowed domain '%s', processing", senderDomain)
-		}
-
-		messageID := sanitizeMessageID(msg)
-		if messageID == "" {
-			messageID = uuid.New().String()
-		}
-		dt := dateFromMessage(msg)
-
-		// Always write raw EML to partitioned path raw/email/year=YYYY/month=MM/day=DD/<messageID>.eml
-		year, month, day := dateParts(dt)
-		rawKey := fmt.Sprintf("%syear=%s/month=%s/day=%s/%s.eml", rawEmailBase, year, month, day, messageID)
-		if _, err := s3c.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:      &bucketName,
-			Key:         &rawKey,
-			Body:        bytes.NewReader(rawBytes),
-			ContentType: aws.String("message/rfc822"),
-			ACL:         s3types.ObjectCannedACLPrivate,
-		}); err != nil {
-			return fmt.Errorf("put raw eml: %w", err)
-		}
-
-		// Extract CSV attachments using enmime
-		env, err := enmime.ReadEnvelope(bytes.NewReader(rawBytes))
-		if err != nil {
-			log.Printf("warn: enmime parse failed (%v); continuing with raw only", err)
-		} else {
-			for _, a := range env.Attachments {
-				ctype, _, _ := mime.ParseMediaType(a.ContentType)
-				name := a.FileName
-				if strings.EqualFold(filepath.Ext(name), ".csv") || strings.EqualFold(ctype, "text/csv") {
-					data := a.Content
-					if data == nil {
-						log.Printf("warn: attachment %s has no content", name)
-						continue
-					}
-					// Desired path: raw/loseit_csv/year=YYYY/month=MM/day=DD/loseit-daily.csv (immutable)
-					// To avoid collisions if multiple emails per day, append index if key exists.
-					baseName := "loseit-daily.csv"
-					if sn := strings.TrimSpace(name); sn != "" {
-						baseName = sanitizeFilename(sn)
-					}
-					csvKey := fmt.Sprintf("%syear=%s/month=%s/day=%s/%s", rawCsvBase, year, month, day, baseName)
-					// If object exists, append suffix -2, -3, ...
-					csvKey = ensureUniqueKey(ctx, s3c, bucketName, csvKey)
-					if _, perr := s3c.PutObject(ctx, &s3.PutObjectInput{
-						Bucket:      &bucketName,
-						Key:         &csvKey,
-						Body:        bytes.NewReader(data),
-						ContentType: aws.String("text/csv"),
-						ACL:         s3types.ObjectCannedACLPrivate,
-					}); perr != nil {
-						log.Printf("warn: put csv %s: %v", csvKey, perr)
-					}
-				}
-			}
-		}
-
-		// Do NOT delete original: raw email is immutable audit trail.
 	}
 	return nil
+}
+
+func processEmail(ctx context.Context, s3c s3API, bucketName, key string) error {
+	rawEmailBase := envOr("RAW_EMAIL_BASE", "raw/email/")
+	rawCsvBase := envOr("RAW_CSV_BASE", "raw/loseit_csv/")
+
+	// Fetch the raw EML
+	obj, err := s3c.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &key})
+	if err != nil {
+		return fmt.Errorf("s3 get %s/%s: %w", bucketName, key, err)
+	}
+	rawBytes, err := io.ReadAll(obj.Body)
+	if err != nil {
+		return fmt.Errorf("read s3 object: %w", err)
+	}
+	_ = obj.Body.Close()
+
+	// Parse headers for Message-ID and Date
+	msg, err := mail.ReadMessage(bytes.NewReader(rawBytes))
+	if err != nil {
+		return fmt.Errorf("parse email message: %w", err)
+	}
+
+	// Check if email is from LoseIt - return early if not
+	if !isLoseItEmailContent(msg) {
+		log.Printf("info: email not from LoseIt domain or doesn't match LoseIt patterns, ignoring")
+		return nil
+	}
+
+	log.Printf("info: processing LoseIt email")
+
+	messageID := sanitizeMessageID(msg)
+	if messageID == "" {
+		messageID = uuid.New().String()
+	}
+	dt := dateFromMessage(msg)
+
+	// Always write raw EML to partitioned path raw/email/year=YYYY/month=MM/day=DD/<messageID>.eml
+	year, month, day := dateParts(dt)
+	rawKey := fmt.Sprintf("%syear=%s/month=%s/day=%s/%s.eml", rawEmailBase, year, month, day, messageID)
+	if _, err := s3c.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      &bucketName,
+		Key:         &rawKey,
+		Body:        bytes.NewReader(rawBytes),
+		ContentType: aws.String("message/rfc822"),
+		ACL:         s3types.ObjectCannedACLPrivate,
+	}); err != nil {
+		return fmt.Errorf("put raw eml: %w", err)
+	}
+
+	// Extract CSV attachments using enmime
+	env, err := enmime.ReadEnvelope(bytes.NewReader(rawBytes))
+	if err != nil {
+		log.Printf("warn: enmime parse failed (%v); continuing with raw only", err)
+	} else {
+		for _, a := range env.Attachments {
+			ctype, _, _ := mime.ParseMediaType(a.ContentType)
+			name := a.FileName
+			if strings.EqualFold(filepath.Ext(name), ".csv") || strings.EqualFold(ctype, "text/csv") {
+				data := a.Content
+				if data == nil {
+					log.Printf("warn: attachment %s has no content", name)
+					continue
+				}
+				// Desired path: raw/loseit_csv/year=YYYY/month=MM/day=DD/loseit-daily.csv (immutable)
+				// To avoid collisions if multiple emails per day, append index if key exists.
+				baseName := "loseit-daily.csv"
+				if sn := strings.TrimSpace(name); sn != "" {
+					baseName = sanitizeFilename(sn)
+				}
+				csvKey := fmt.Sprintf("%syear=%s/month=%s/day=%s/%s", rawCsvBase, year, month, day, baseName)
+				// If object exists, append suffix -2, -3, ...
+				csvKey = ensureUniqueKey(ctx, s3c, bucketName, csvKey)
+				if _, perr := s3c.PutObject(ctx, &s3.PutObjectInput{
+					Bucket:      &bucketName,
+					Key:         &csvKey,
+					Body:        bytes.NewReader(data),
+					ContentType: aws.String("text/csv"),
+					ACL:         s3types.ObjectCannedACLPrivate,
+				}); perr != nil {
+					log.Printf("warn: put csv %s: %v", csvKey, perr)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func isLoseItEmailContent(msg *mail.Message) bool {
+	// Check From header
+	allowedDomain := envOr("ALLOWED_SENDER_DOMAIN", "loseit.com")
+	fromHeader := msg.Header.Get("From")
+	if fromHeader != "" {
+		if addr, err := mail.ParseAddress(fromHeader); err == nil {
+			parts := strings.Split(addr.Address, "@")
+			if len(parts) == 2 && strings.EqualFold(parts[1], allowedDomain) {
+				return true
+			}
+		}
+	}
+
+	// Check subject for LoseIt patterns
+	subject := strings.ToLower(msg.Header.Get("Subject"))
+	loseItPatterns := []string{"loseit", "lose it", "daily report", "weight report"}
+	for _, pattern := range loseItPatterns {
+		if strings.Contains(subject, pattern) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func urlDecode(s string) (string, error) {
