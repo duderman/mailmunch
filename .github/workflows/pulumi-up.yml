@@ -45,7 +45,7 @@ jobs:
           workflow: build.yml
           event: push
           commit: ${{ github.event.workflow_run.head_sha }}
-          name: lambda-zip
+          name: lambda-zips
           path: dist/
           if_no_artifact_found: fail
 
@@ -55,7 +55,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: build.yml
-          name: lambda-zip
+          name: lambda-zips
           path: dist/
           # Try to match either by commit or branch name
           commit: ${{ github.event.inputs.ref }}
