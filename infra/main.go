@@ -183,7 +183,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create S3 access policy for email ingest Lambda
 		s3PolicyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
 			Statements: []iam.GetPolicyDocumentStatement{
@@ -207,7 +207,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-email-ingest-s3", project, stack), &iam.RolePolicyArgs{
 			Role:   ingestRole.ID(),
 			Policy: pulumi.String(s3PolicyDoc.Json),
@@ -340,7 +340,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create S3 access policy for Glue (curated data access only)
 		glueS3PolicyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
 			Statements: []iam.GetPolicyDocumentStatement{
@@ -370,7 +370,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-glue-s3", project, stack), &iam.RolePolicyArgs{
 			Role:   glueRole.ID(),
 			Policy: pulumi.String(glueS3PolicyDoc.Json),
@@ -405,7 +405,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create S3 access policy for transform Lambda
 		transformS3PolicyDoc, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
 			Statements: []iam.GetPolicyDocumentStatement{
@@ -429,7 +429,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-transform-s3", project, stack), &iam.RolePolicyArgs{
 			Role:   transformRole.ID(),
 			Policy: pulumi.String(transformS3PolicyDoc.Json),
