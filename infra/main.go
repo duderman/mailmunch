@@ -492,7 +492,10 @@ func main() {
 		// Optional: set up SES receiving to S3 for a specific recipient address
 		if recipient, ok := ctx.GetConfig("mailmunch:recipientAddress"); ok && recipient != "" {
 			// Create (or ensure) a receipt rule set and rule to write to S3 prefix raw/email/incoming/
-			ruleSet, err := ses.NewReceiptRuleSet(ctx, fmt.Sprintf("%s-%s-receipt-set", project, stack), &ses.ReceiptRuleSetArgs{}, awsOpts)
+			ruleSetName := fmt.Sprintf("%s-%s-receipt-set", project, stack)
+			ruleSet, err := ses.NewReceiptRuleSet(ctx, ruleSetName, &ses.ReceiptRuleSetArgs{
+				RuleSetName: pulumi.String(ruleSetName),
+			}, awsOpts)
 			if err != nil {
 				return err
 			}
