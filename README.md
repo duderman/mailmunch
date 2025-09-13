@@ -2,11 +2,13 @@
 
 This repo is a minimal scaffold for an AWS project using Pulumi (Go) and Go-based AWS Lambdas. It provisions:
 
-- S3 bucket (artifacts)
+- S3 buckets (artifacts + data with lifecycle policies)
 - ECR repository
 - Secrets Manager secret
 - AppConfig application/profile/version (hosted)
+- SES email receiving with dedicated recipient filtering
 - Lambda functions for email processing and data transformation
+- Glue database and crawler for analytics
 
 And includes:
 
@@ -20,10 +22,11 @@ And includes:
 - Go 1.22+
 - Pulumi CLI
 - AWS credentials configured (locally or via OIDC in CI)
+- SES domain verification (for email receiving)
 
 ## Layout
 
-- `lambda/email_ingest`: Email processing Lambda for extracting CSV attachments
+- `lambda/email_ingest`: Email processing Lambda for LoseIt domain filtering and CSV extraction
 - `lambda/loseit_transform`: Data transformation Lambda for converting CSV to Parquet
 - `infra`: Pulumi Go program
 - `.github/workflows`: CI/CD workflows
@@ -34,15 +37,28 @@ And includes:
 This project includes a complete serverless data processing pipeline for LoseIt food diary exports:
 
 ```text
-SES → S3 (raw emails) → Lambda (extract CSV) → S3 (raw CSV) → Lambda (transform) → S3 (Parquet) → Athena
+SES (recipient filter) → S3 incoming/ (90-day retention) → Lambda (LoseIt check) → S3 analytics/ (forever) + CSV → Lambda → Parquet → Athena
 ```
+
+### Email Processing Flow
+
+1. **SES receives emails** - only for configured recipient address
+2. **All emails saved** to `raw/email/incoming/` with 90-day retention
+3. **S3 triggers Lambda** for each incoming email
+4. **Lambda checks if LoseIt email**:
+   - **If YES**: Saves to analytics path + extracts CSV attachments
+   - **If NO**: Ignores (stays in incoming/ with retention)
+5. **CSV triggers transform** Lambda to create Parquet files
+6. **Glue crawler** makes data queryable in Athena
 
 ### S3 Structure
 
 ```text
 s3://mailmunch-data/
   raw/
-    email/year=2025/month=08/day=27/<message-id>.eml
+    email/
+      incoming/           # All emails (90-day retention)
+      year=2025/month=08/day=27/<message-id>.eml  # LoseIt analytics (forever)
     loseit_csv/year=2025/month=08/day=27/loseit-daily.csv
   curated/
     loseit_parquet/year=2025/month=08/day=27/part-0000.snappy.parquet
@@ -85,6 +101,10 @@ make build-all
 cd infra
 pulumi stack init dev || true
 pulumi config set mailmunch:region us-east-1
+pulumi config set mailmunch:dataBucketName mailmunch-data            # optional: S3 bucket name
+pulumi config set mailmunch:allowedSenderDomain loseit.com           # optional: allowed email domain  
+pulumi config set mailmunch:sesEmailIdentity mailmunch.co.uk         # optional: SES email identity
+pulumi config set mailmunch:recipientAddress reports@mailmunch.co.uk # required: recipient address
 ```
 
 1. Preview infra
@@ -99,6 +119,13 @@ make infra-preview
 make infra-up
 ```
 
+### Configuration Options
+
+- `mailmunch:dataBucketName` - S3 bucket name for data storage (default: "mailmunch-data")
+- `mailmunch:allowedSenderDomain` - Domain to filter emails from (default: "loseit.com")  
+- `mailmunch:sesEmailIdentity` - SES email identity for domain verification (optional)
+- `mailmunch:recipientAddress` - Email address that SES will process (required for email receiving)
+
 ## CI/CD secrets
 
 Set GitHub secrets if using OIDC deploys:
@@ -110,4 +137,8 @@ Set GitHub secrets if using OIDC deploys:
 ## Notes
 
 - All Lambda functions use custom runtime `provided.al2`. The build script produces a `bootstrap` binary in the zip.
-- SES is referenced implicitly (no resources created by default) to avoid requiring domain verification upfront. Add identities/routes later as needed.
+- SES email receiving requires domain verification and MX record configuration
+- Email processing includes intelligent filtering - only LoseIt emails are processed for analytics
+- Non-LoseIt emails are retained for 90 days in the incoming folder, then automatically deleted
+- Processed LoseIt data is kept forever for analytics and machine learning
+- Glue crawler automatically discovers schema changes in Parquet files for Athena queries
