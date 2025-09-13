@@ -102,7 +102,7 @@ cd infra
 pulumi stack init dev || true
 pulumi config set mailmunch:region us-east-1
 pulumi config set mailmunch:dataBucketName mailmunch-data            # optional: S3 bucket name
-pulumi config set mailmunch:allowedSenderDomain loseit.com           # optional: allowed email domain  
+pulumi config set mailmunch:allowedSenderDomain loseit.com           # optional: allowed email domain
 pulumi config set mailmunch:sesEmailIdentity mailmunch.co.uk         # optional: SES email identity
 pulumi config set mailmunch:recipientAddress reports@mailmunch.co.uk # required: recipient address
 ```
@@ -122,7 +122,7 @@ make infra-up
 ### Configuration Options
 
 - `mailmunch:dataBucketName` - S3 bucket name for data storage (default: "mailmunch-data")
-- `mailmunch:allowedSenderDomain` - Domain to filter emails from (default: "loseit.com")  
+- `mailmunch:allowedSenderDomain` - Domain to filter emails from (default: "loseit.com")
 - `mailmunch:sesEmailIdentity` - SES email identity for domain verification (optional)
 - `mailmunch:recipientAddress` - Email address that SES will process (required for email receiving)
 
