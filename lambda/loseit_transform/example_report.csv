@@ -1,0 +1,24 @@
+Date,Name,Icon,Type,Quantity,Units,Calories,Deleted,Fat (g),Protein (g),Carbohydrates (g),Saturated Fat (g),Sugars (g),Fiber (g),Cholesterol (mg),Sodium (mg)
+08/27/2025,Porridge Oats,Cereal,Breakfast,50.0,Grams,185,0,3.90,6,29.50,0.60,0.45,4.40,0,15
+08/27/2025,Gold Standard Whey (Double Rich Chocolate),PowderedDrink,Breakfast,30.0,Grams,112,0,1.38,23.23,1.59,0.51,0.96,0.69,n/a,116.13
+08/27/2025,Chia seeds,Seed,Breakfast,10.0,Grams,42,0,2.80,2.40,1.60,0.33,0.7,3.40,n/a,0.1
+08/27/2025,"Raspberries, Raw",Raspberry,Breakfast,30.0,Grams,24,0,0.32,0.54,5.40,n/a,1.98,3.15,0,0.45
+08/27/2025,"Blackberry, Raw",Blackberry,Breakfast,30.0,Grams,15,0,0,0.30,2.40,0,2.40,0,0,0
+08/27/2025,Blueberries,Blueberry,Breakfast,50.0,Grams,23,0,0.13,0.44,4.56,0.6,4.56,0.75,0,n/a
+08/27/2025,Kefir,MilkShake,Breakfast,250.0,Milliliters,116,0,5.28,8.45,8.45,n/a,n/a,n/a,n/a,n/a
+08/27/2025,BBQ Banana Blossom Burrito,Burrito,Lunch,385.0,Grams,365,0,4.70,13.70,57.10,0.80,18.20,14.90,n/a,2600
+08/27/2025,Extra Fine Green Beans,BeanGreen,Lunch,40.0,Grams,12,0,0.16,0.84,1.20,0.4,0.88,1.36,n/a,n/a
+08/27/2025,Veggie Cake Beetroot & Balsamic,Beet,Lunch,1.0,Each,40,0,1.10,2.40,4.80,0.10,0.30,0.60,n/a,n/a
+08/27/2025,TVP Soya Chunks,Fritter,Lunch,30.0,Grams,113,0,0.45,15,11.70,0.6,0,1.5,n/a,0
+08/27/2025,Baked Gnocchi Ragu,Pasta,Dinner,390.0,Grams,483,0,15.60,21.50,55.30,1.50,13.70,10.70,n/a,1600
+08/27/2025,Gold Standard Whey (Double Rich Chocolate),PowderedDrink,Dinner,30.0,Grams,112,0,1.38,23.23,1.59,0.51,0.96,0.69,n/a,116.13
+08/27/2025,Sour Cream And Chive Large Rice And Corn Cake,RiceCake,Dinner,2.0,Each,76,0,0.65,1.89,17.1,0.15,0.46,0.42,n/a,97.26
+08/27/2025,"Egg, Hard Boiled",Egg,Dinner,1.0,Each,78,0,5,6,1,2,1,0,212,62
+08/27/2025,✓ Natural Yoghurt 0% Fat,Yogurt,Dinner,50.0,Grams,26,0,0.15,2.75,3.40,0.10,3.40,0,n/a,90
+08/27/2025,"Kiwifruit, Zespri Green, Raw",Kiwi,Morning Snacks,1.0,Each,36,0,0.74,0.74,6.66,0,6.66,2.22,0,1.48
+08/27/2025,"Tangerine, Flesh, Raw",Orange,Morning Snacks,100.0,Grams,37,0,0,1,8,n/a,8,2,0,2
+08/27/2025,"Tomato, Cherry, Raw",Tomato,Afternoon Snacks,130.0,Grams,21,0,0,1.30,2.60,0,2.60,0,0,13
+08/27/2025,Reduced Fat Salad Cheese,Cheese,Afternoon Snacks,50.0,Grams,82,0,4.67,8.33,1.67,3,0.50,0,n/a,333.33
+08/27/2025,Chocolate Protein Pudding,Pudding,Snacks,140.0,Grams,106,0,0.50,14,10.30,0.30,6.50,0,n/a,190
+08/27/2025,"Orange, Medium",Orange,Snacks,1.0,Each,62,0,0.16,1.23,15.39,0.1,12.25,3.14,0,0
+08/27/2025,Steps Calorie Bonus,Default,Exercise,0,minutes,-0.0,0

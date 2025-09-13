@@ -1,0 +1,1794 @@
+Delivered-To: zduderman@gmail.com
+Received: by 2002:a05:612c:108c:b0:4ef:97e3:f142 with SMTP id p12csp695582vqa;
+        Thu, 28 Aug 2025 00:01:48 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IEOX6h1hxfN6lGqh1/IewIHoxzBkkblhroTM6Jk4rO254vUWXJcbI2BbZpoH1YeRuzCB872
+X-Received: by 2002:a05:6214:e87:b0:70d:de0b:b89 with SMTP id 6a1803df08f44-70dde0b354fmr73421086d6.38.1756364507976;
+        Thu, 28 Aug 2025 00:01:47 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1756364507; cv=none;
+        d=google.com; s=arc-20240605;
+        b=C22aiVntw8XTVZ774c0P3nxzxh7EIWa73PS1XjJY87QXXywY7SOysYyyxnRdHPV+Ps
+         6wYMV95TivRe05r91Ij+kbFoj6vHl7nda+kpaNU2A4MCiY/7Z717h+M8qAd+zc6RpYKF
+         WT0CQKc9tSYSJ26CaDsXosnc3ToBbxsQubEd0jXrM3CZAsIpG7k4gDcOMzeCQySmY+eZ
+         zNPSF84c51njxIIT6ft6t2EBTSMtGs15YEifBS/zXk3/Pgw8D844lIHwYler3xraieeq
+         KQ1bYH1GLZsDwsXBl9jZawx/Ef5M667QaGFnAqYr1W7z0ra4sJrTGKxFhnBS1aG63hIV
+         5TVw==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=to:date:reply-to:mime-version:subject:message-id:from
+         :dkim-signature:dkim-signature;
+        bh=vYdB9j41qEm0HpMNvvzUmZR0h/PL1H8yt4gdA0+2+kQ=;
+        fh=hDrtfs9V7f65CxqB+xAfgPwpsbECTQw7mtS4OBIkMCg=;
+        b=e+zbk/0v78SjkIX7F8rZQ/dq+fyJYGSQgbRd0XPDY+kx4UxjlahwpUn105EkHg5caN
+         0rd4W9jI8cjU4LGFGvqFxRCc4RuAtfMgbMzLthgDr6PvV5fBF/ELDjHD9JpFKz3iwR3W
+         Y2HbFqcx+Tk+Fh3Jbsi8v2DFHyflKELtClaz9qDUW0ntXNBe+9uPXj3sOT57+vtzyAk+
+         gQIQi9P5VphxOmTLbWka9ACn7KAyEDzsJnPQe0Ho6JRje8Xa89AwdbMHahNaONg5/Qtb
+         Z2VI1xskA7GbIUmiCjJ8lR5ia0pYGygr6RX88ceM1owU1GgYCsQjHKOEpIJQbmnFMvkn
+         2Zeg==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@loseit.com header.s=s1 header.b=vTPa3B9Z;
+       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=e9LnusOg;
+       spf=pass (google.com: domain of bounces+1993498-3233-zduderman=gmail.com@em1.loseit.com designates 167.89.0.131 as permitted sender) smtp.mailfrom="bounces+1993498-3233-zduderman=gmail.com@em1.loseit.com";
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=loseit.com
+Return-Path: <bounces+1993498-3233-zduderman=gmail.com@em1.loseit.com>
+Received: from xtrwhhvp.outbound-mail.sendgrid.net (xtrwhhvp.outbound-mail.sendgrid.net. [167.89.0.131])
+        by mx.google.com with ESMTPS id 6a1803df08f44-70dc784c11csi30763946d6.275.2025.08.28.00.01.47
+        for <zduderman@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Thu, 28 Aug 2025 00:01:47 -0700 (PDT)
+Received-SPF: pass (google.com: domain of bounces+1993498-3233-zduderman=gmail.com@em1.loseit.com designates 167.89.0.131 as permitted sender) client-ip=167.89.0.131;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@loseit.com header.s=s1 header.b=vTPa3B9Z;
+       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=e9LnusOg;
+       spf=pass (google.com: domain of bounces+1993498-3233-zduderman=gmail.com@em1.loseit.com designates 167.89.0.131 as permitted sender) smtp.mailfrom="bounces+1993498-3233-zduderman=gmail.com@em1.loseit.com";
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=loseit.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=loseit.com;
+	h=from:subject:mime-version:reply-to:date:to:content-type:cc:
+	content-type:date:feedback-id:from:subject:to;
+	s=s1; bh=vYdB9j41qEm0HpMNvvzUmZR0h/PL1H8yt4gdA0+2+kQ=;
+	b=vTPa3B9ZR46MRh4ozcAZj63G/Sx9PpoW+yERbPmGpWJfczBYX1LpmMyfueB0GM1+6+KL
+	hMj2oA/17/1+67OoXKMyo6zuzjgjMx/E2dpakf8S3Gyrj8FfvfIINGyFTFVDs7ReBMey1L
+	6doRjUDO/jFfove603xAJLgLPxpItpduRNP6DTbhjs1jJ2kPKZIK/vAqziLAJrrwcLE02r
+	rpzeT9xcXnmop5uC1VjMhInaRnwgmZfJZds5snhg40OC/J+lZOzwOQC83Z7eR3O6WphnfZ
+	wRKwPWg07/aSQbsgqNJID7hGJHTdK8hrFNj4MGR1P88DTxJTE14GuGFNeyYFAkKQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sendgrid.info;
+	h=from:subject:mime-version:reply-to:date:to:content-type:cc:
+	content-type:date:feedback-id:from:subject:to;
+	s=smtpapi; bh=vYdB9j41qEm0HpMNvvzUmZR0h/PL1H8yt4gdA0+2+kQ=;
+	b=e9LnusOgAck8UM7DwdQCPyPvt44Es/47nBiJP0WVzQ+BShVfJsyOmh0pQ4MzojvpafyX
+	adSFEuPUNlJ2BrDKGsWZTFtYy4WZKyINRYYQ7G3ZpUUYAdKuaSMvjBK8oXo4tIMi+IBBc/
+	oAxZldEpm6HMPFyPCGQrl6G3fGLnK8C/Q=
+Received: by recvd-868874bfdf-b28n7 with SMTP id recvd-868874bfdf-b28n7-1-68AFFEDB-4C
+	2025-08-28 07:01:47.348349607 +0000 UTC m=+1849184.333416071
+Received: from ip-172-16-7-28.ec2.internal (unknown)
+	by geopod-ismtpd-4 (SG)
+	with ESMTP id ofIQ_jwGQi24NcDoDSr8Qg
+	for <zduderman@gmail.com>;
+	Thu, 28 Aug 2025 07:01:47.331 +0000 (UTC)
+From: Lose It! <donotreply@loseit.com>
+Message-ID: <1548136653.206771756364507333.JavaMail.root@ip-172-16-7-28.ec2.internal>
+Subject: Lose It! Daily Summary for Wed, Aug 27th
+MIME-Version: 1.0
+Reply-To: zduderman@gmail.com
+Date: Thu, 28 Aug 2025 07:01:47 +0000 (UTC)
+X-SG-EID: 
+ =?us-ascii?Q?u001=2EKEPGeJk0epBarWO=2F5V+yoBc6seWGYuyLrKDkrllLZOWd7s36XflfQuMgi?=
+ =?us-ascii?Q?AdkkV+ELYh+C4IczCT9gEtf0CpHw+6FH=2FEt9EEv?=
+ =?us-ascii?Q?zOJkKFiJnsj2m2EBZtn3+cCn2aW3eeFpsXadn8G?=
+ =?us-ascii?Q?2KoqyrW1LhA54ti+Dz=2FxVBMI2hy29Dmsl3Y4mCB?=
+ =?us-ascii?Q?AymfkjNXdt0nediHfToL4uIH01FXzy+KWcLLbiV?=
+ =?us-ascii?Q?Qg505rAOYmXkOX9A9qqXzw=3D?=
+X-SG-ID: 
+ =?us-ascii?Q?u001=2ESdBcvi+Evd=2FbQef8eZF3BjSO8pVMXRAZ9bxGwjYHxVD1m7Pi106Cljh4+?=
+ =?us-ascii?Q?oikmLztjGjYz2vk1aFrDEr=2F8TL+MQ=3D=3D?=
+To: zduderman@gmail.com
+X-Entity-ID: u001.izp7x0zDnvVjJylet1PhnA==
+Content-Type: multipart/mixed; 
+	boundary="----=_Part_41433_96337609.1756364507322"
+
+------=_Part_41433_96337609.1756364507322
+Content-Type: multipart/alternative; 
+	boundary="----=_Part_41434_326377729.1756364507322"
+
+------=_Part_41434_326377729.1756364507322
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: inline
+
+<html>
+<head>
+</head>
+<body style=3D"font-family: 'Segoe UI', 'Lucida Grande', 'Tahoma', 'Helveti=
+ca';">
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0">
+    <tr><td style=3D"padding-bottom: 12px"></td></tr>
+    <tr><td style=3D"padding-bottom: 6px" align=3D"center"><img alt=3D"Lose=
+ It!" border=3D"0" src=3D"https://assets.loseit.com/emails/LoseIt_Logo_NoTa=
+gline_FullColor_246x62.png"/>&nbsp;</td></tr>
+    <tr>
+        <td style=3D"padding-bottom: 6px" align=3D"center" height=3D"1px">
+            <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" width=
+=3D"60%">
+                <tr>
+                    <td bgcolor=3D"#fdfdfd" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#fafafa" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f8f8f8" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f4f4f4" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#efefef" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e9e9e9" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e6e6e6" width=3D"3%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e4e4e4" width=3D"58%" height=3D"1px" st=
+yle=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e6e6e6" width=3D"3%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e9e9e9" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#efefef" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f4f4f4" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f8f8f8" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#fafafa" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#fdfdfd" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+<div id=3D"message" style=3D"margin: 10px;">
+<h3 style=3D"padding-bottom: 0px; margin-bottom: 0px;">Daily Summary for  W=
+ed, Aug 27th</h3>
+<p style=3D"padding-top: 0px; margin-top: 0px; padding-bottom: 10px;">for N=
+ick Norkin</p>
+
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" width=3D"100%" styl=
+e=3D"padding-bottom: 30px;">
+    <tr>
+
+        <td valign=3D"top">
+            <table style=3D"padding-right: 30px;" border=3D"0" cellpadding=
+=3D"0" cellspacing=3D"0">
+                <tr>
+                    <td colspan=3D"2" style=3D"padding: 3px; margin-bottom:=
+ 7px; font-weight: bold; background-color: #e1e4ea; padding-right: 3px;">Ca=
+lorie Summary</td>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">D=
+aily calorie budget</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+2,229</td>
+                </tr>
+                <tr>
+                    <td colspan=3D"2" style=3D"padding-bottom: 10px;"> </td=
+>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">F=
+ood calories consumed</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+2,166</td>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; border-bottom: 1px soli=
+d gray; padding-right: 30px;">Exercise calories burned</td>
+                    <td style=3D"border-bottom: 1px solid gray; padding-rig=
+ht: 3px; padding-bottom: 2px;">0</td>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">N=
+et calories for the day</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+2,166</td>
+                </tr>
+                <tr>
+                    <td colspan=3D"2" style=3D"padding-bottom: 10px;"> </td=
+>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">+=
+/- for the day</td>
+                    <td style=3D"padding-right: 3px; padding-top: 2px;">
+                        63 under budget
+                    </td>
+                </tr>
+            </table>
+        </td>
+        <td valign=3D"top">
+            <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0">
+                <tr>
+                    <td style=3D"padding: 3px; margin-bottom: 7px; font-wei=
+ght: bold; background-color: #e1e4ea; padding-right: 3px;">Weight Summary</=
+td>
+                    <td style=3D"padding-right: 3px; background-color: #e1e=
+4ea">lbs</td>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">G=
+oal Weight</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+187.4 lbs</td>
+                </tr>
+                <tr>
+                    <td colspan=3D"2" style=3D"padding-bottom: 10px;"> </td=
+>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">S=
+tart Weight</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+201.7 lbs</td>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; border-bottom: 1px soli=
+d gray; padding-right: 30px;">Today's Weight</td>
+                    <td style=3D"border-bottom: 1px solid gray; padding-rig=
+ht: 3px; padding-bottom: 2px;">217.8 lbs</td>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">G=
+ained So Far</td>
+                    <td style=3D"padding-right: 3px; padding-top: 2px;">16.=
+1 lbs</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" style=3D"padding-bo=
+ttom: 30px;">
+    <tr>
+        <td colspan=3D"2" style=3D"padding: 3px; font-weight: bold; backgro=
+und-color: #e1e4ea;">Daily Log</td>
+        <td style=3D" background-color: #e1e4ea; padding-right: 3px;">Calor=
+ies</td>
+    </tr>
+
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Bre=
+akfast</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    517
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Porridge Oats</td=
+>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+185</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Gold Standard Whe=
+y (Double Rich Chocolate)</td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+112</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Chia seeds</td>
+    <td style=3D"padding-right: 30px;">10 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+42</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Raspberries, Raw<=
+/td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+24</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Sat. Fat.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Blackberry, Raw</=
+td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+15</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Blueberries</td>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+22</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Sodium</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Kefir</td>
+    <td style=3D"padding-right: 30px;">250 Milliliters</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+116</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Fiber, Sugars, Chol., Sat. Fat., Sodium</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Mor=
+ning Snacks</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    73
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Kiwifruit, Zespri=
+ Green, Raw</td>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+36</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Tangerine, Flesh,=
+ Raw</td>
+    <td style=3D"padding-right: 30px;">100 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+37</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Sat. Fat.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Lun=
+ch</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    530
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">BBQ Banana Blosso=
+m Burrito</td>
+    <td style=3D"padding-right: 30px;">385 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+365</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Extra Fine Green =
+Beans</td>
+    <td style=3D"padding-right: 30px;">40 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+12</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol., Sodium</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Veggie Cake Beetr=
+oot & Balsamic </td>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+40</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol., Sodium</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">TVP Soya Chunks</=
+td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+112</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Aft=
+ernoon Snacks</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    102
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Tomato, Cherry, R=
+aw</td>
+    <td style=3D"padding-right: 30px;">130 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+21</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Reduced Fat Salad=
+ Cheese</td>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+82</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Din=
+ner</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    775
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Baked Gnocchi Rag=
+u</td>
+    <td style=3D"padding-right: 30px;">390 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+483</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Gold Standard Whe=
+y (Double Rich Chocolate)</td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+112</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Sour Cream And Ch=
+ive Large Rice And Corn Cake</td>
+    <td style=3D"padding-right: 30px;">2 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+76</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Egg, Hard Boiled<=
+/td>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+78</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">=E2=9C=93 Natural=
+ Yoghurt 0% Fat</td>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+26</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Sna=
+cks</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    168
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Chocolate Protein=
+ Pudding</td>
+    <td style=3D"padding-right: 30px;">140 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+106</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Orange, Medium</t=
+d>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+62</td>
+</tr>
+
+
+
+
+
+
+
+
+
+
+        <tr>
+            <td style=3D"font-weight: bold; padding-left: 3px; border-botto=
+m: 1px solid gray; padding-right: 30px; padding-top: 12px;">Exercises</td>
+            <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; p=
+adding-right: 3px;" colspan=3D"2" align=3D"right">
+            0
+            </td>
+        </tr>
+    <tr>
+        <td style=3D"padding-left: 3px; padding-right: 30px;">Steps Calorie=
+ Bonus</td>
+        <td style=3D"padding-right: 30px;">0 Min</td>
+        <td align=3D"right" style=3D"padding-right: 3px;">0</td>
+    </tr>
+</table>
+
+
+	<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" style=3D"padding-b=
+ottom: 30px;">
+	<tr>
+		<td colspan=3D"2" style=3D"padding: 3px; font-weight: bold; background-co=
+lor: #e1e4ea;">Nutrient Summary</td>
+		<td style=3D" background-color: #e1e4ea; padding-right: 3px;">% Calories<=
+/td>
+	</tr>
+=09
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Fat
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		49g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+			21.4%
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+			&nbsp;&nbsp;
+			Saturated Fat
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		10g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Cholesterol
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		212mg
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Sodium
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		5,237mg
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Carbohydrates
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		251g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+			48.6%
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+			&nbsp;&nbsp;
+			Fiber
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		49g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+			&nbsp;&nbsp;
+			Sugars
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		86g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Protein
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		155g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+			30%
+	=09
+		</td>
+=09
+	</table>
+
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" style=3D"padding-bo=
+ttom: 30px;">
+    <tr>
+        <td style=3D"padding: 3px; font-weight: bold; background-color: #e1=
+e4ea;">Goals Summary</td>
+        <td style=3D" background-color: #e1e4ea; padding-right: 3px;"></td>
+    </tr>
+
+        <tr>
+            <td style=3D"padding-left: 3px; padding-right: 30px; padding-to=
+p: 3px;">
+            Protein(g)
+            </td>
+            <td style=3D"padding-right: 30px; padding-top: 3px;">
+                155g
+            </td>
+        <tr>
+            <td style=3D"padding-left: 3px; padding-right: 30px; padding-to=
+p: 3px;">
+            Steps
+            </td>
+            <td style=3D"padding-right: 30px; padding-top: 3px;">
+                4,910
+            </td>
+
+</table>
+
+    <br/><br/><br/>
+    <div style=3D"font-size: 95%">
+        Report generated by Lose It!. For more information or to sign up fo=
+r your Lose It! account, please visit <a href=3D"https://www.loseit.com" st=
+yle=3D"color: #e69614; text-decoration: none;" target=3D"_blank">https://ww=
+w.loseit.com</a>
+        <br/><br/>
+        This email was sent to zduderman@gmail.com.<br/>
+        <a href=3D"https://www.loseit.com/unsubscribe?key=3D4_zduderman%40g=
+mail.com_39644994&verify=3DO7oRSOWKc4wbjgweUcQyJcWXPItBHYHAtTKV4xBK3M8%3D" =
+style=3D"color: #e69614; text-decoration: none;">Unsubscribe from this repo=
+rt</a><br/>
+        <a href=3D"https://www.loseit.com/unsubscribe?key=3D1_zduderman%40g=
+mail.com&verify=3DRzrdFYaxlrNV%2FV9jo5khgm1PtUWdhFN8nZK2AKaHgkc%3D" style=
+=3D"color: #e69614; text-decoration: none;">Unsubscribe from all emails</a>=
+<br/><br/>
+
+        Lose It!, Everyday Health Inc, c/o FitNow, Inc dba Lose It! 360 Par=
+k Avenue South, 17th Floor, New York, New York 10010.<br/>
+        <a href=3D"https://www.loseit.com/?tag=3Dfse" style=3D"color: #e696=
+14; text-decoration: none;" target=3D"_blank">www.loseit.com</a>
+    </div>
+</div>
+</body>
+</html>
+
+
+
+------=_Part_41434_326377729.1756364507322
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: inline
+
+<html>
+<head>
+</head>
+<body style=3D"font-family: 'Segoe UI', 'Lucida Grande', 'Tahoma', 'Helveti=
+ca';">
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0">
+    <tr><td style=3D"padding-bottom: 12px"></td></tr>
+    <tr><td style=3D"padding-bottom: 6px" align=3D"center"><img alt=3D"Lose=
+ It!" border=3D"0" src=3D"https://assets.loseit.com/emails/LoseIt_Logo_NoTa=
+gline_FullColor_246x62.png"/>&nbsp;</td></tr>
+    <tr>
+        <td style=3D"padding-bottom: 6px" align=3D"center" height=3D"1px">
+            <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" width=
+=3D"60%">
+                <tr>
+                    <td bgcolor=3D"#fdfdfd" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#fafafa" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f8f8f8" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f4f4f4" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#efefef" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e9e9e9" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e6e6e6" width=3D"3%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e4e4e4" width=3D"58%" height=3D"1px" st=
+yle=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e6e6e6" width=3D"3%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#e9e9e9" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#efefef" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f4f4f4" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#f8f8f8" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#fafafa" width=3D"1%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                    <td bgcolor=3D"#fdfdfd" width=3D"4%" height=3D"1px" sty=
+le=3D"font-size: 1px; line-height: 1px;">&nbsp;</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+<div id=3D"message" style=3D"margin: 10px;">
+<h3 style=3D"padding-bottom: 0px; margin-bottom: 0px;">Daily Summary for  W=
+ed, Aug 27th</h3>
+<p style=3D"padding-top: 0px; margin-top: 0px; padding-bottom: 10px;">for N=
+ick Norkin</p>
+
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" width=3D"100%" styl=
+e=3D"padding-bottom: 30px;">
+    <tr>
+
+        <td valign=3D"top">
+            <table style=3D"padding-right: 30px;" border=3D"0" cellpadding=
+=3D"0" cellspacing=3D"0">
+                <tr>
+                    <td colspan=3D"2" style=3D"padding: 3px; margin-bottom:=
+ 7px; font-weight: bold; background-color: #e1e4ea; padding-right: 3px;">Ca=
+lorie Summary</td>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">D=
+aily calorie budget</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+2,229</td>
+                </tr>
+                <tr>
+                    <td colspan=3D"2" style=3D"padding-bottom: 10px;"> </td=
+>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">F=
+ood calories consumed</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+2,166</td>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; border-bottom: 1px soli=
+d gray; padding-right: 30px;">Exercise calories burned</td>
+                    <td style=3D"border-bottom: 1px solid gray; padding-rig=
+ht: 3px; padding-bottom: 2px;">0</td>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">N=
+et calories for the day</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+2,166</td>
+                </tr>
+                <tr>
+                    <td colspan=3D"2" style=3D"padding-bottom: 10px;"> </td=
+>
+                </tr>
+                <tr style=3D"padding-bottom: 10px;">
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">+=
+/- for the day</td>
+                    <td style=3D"padding-right: 3px; padding-top: 2px;">
+                        63 under budget
+                    </td>
+                </tr>
+            </table>
+        </td>
+        <td valign=3D"top">
+            <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0">
+                <tr>
+                    <td style=3D"padding: 3px; margin-bottom: 7px; font-wei=
+ght: bold; background-color: #e1e4ea; padding-right: 3px;">Weight Summary</=
+td>
+                    <td style=3D"padding-right: 3px; background-color: #e1e=
+4ea">lbs</td>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">G=
+oal Weight</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+187.4 lbs</td>
+                </tr>
+                <tr>
+                    <td colspan=3D"2" style=3D"padding-bottom: 10px;"> </td=
+>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">S=
+tart Weight</td>
+                    <td style=3D"padding-right: 3px; padding-bottom: 2px;">=
+201.7 lbs</td>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; border-bottom: 1px soli=
+d gray; padding-right: 30px;">Today's Weight</td>
+                    <td style=3D"border-bottom: 1px solid gray; padding-rig=
+ht: 3px; padding-bottom: 2px;">217.8 lbs</td>
+                </tr>
+                <tr>
+                    <td style=3D"padding-left: 3px; padding-right: 30px;">G=
+ained So Far</td>
+                    <td style=3D"padding-right: 3px; padding-top: 2px;">16.=
+1 lbs</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" style=3D"padding-bo=
+ttom: 30px;">
+    <tr>
+        <td colspan=3D"2" style=3D"padding: 3px; font-weight: bold; backgro=
+und-color: #e1e4ea;">Daily Log</td>
+        <td style=3D" background-color: #e1e4ea; padding-right: 3px;">Calor=
+ies</td>
+    </tr>
+
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Bre=
+akfast</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    517
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Porridge Oats</td=
+>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+185</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Gold Standard Whe=
+y (Double Rich Chocolate)</td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+112</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Chia seeds</td>
+    <td style=3D"padding-right: 30px;">10 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+42</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Raspberries, Raw<=
+/td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+24</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Sat. Fat.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Blackberry, Raw</=
+td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+15</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Blueberries</td>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+22</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Sodium</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Kefir</td>
+    <td style=3D"padding-right: 30px;">250 Milliliters</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+116</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Fiber, Sugars, Chol., Sat. Fat., Sodium</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Mor=
+ning Snacks</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    73
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Kiwifruit, Zespri=
+ Green, Raw</td>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+36</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Tangerine, Flesh,=
+ Raw</td>
+    <td style=3D"padding-right: 30px;">100 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+37</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Sat. Fat.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Lun=
+ch</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    530
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">BBQ Banana Blosso=
+m Burrito</td>
+    <td style=3D"padding-right: 30px;">385 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+365</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Extra Fine Green =
+Beans</td>
+    <td style=3D"padding-right: 30px;">40 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+12</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol., Sodium</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Veggie Cake Beetr=
+oot & Balsamic </td>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+40</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol., Sodium</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">TVP Soya Chunks</=
+td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+112</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Aft=
+ernoon Snacks</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    102
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Tomato, Cherry, R=
+aw</td>
+    <td style=3D"padding-right: 30px;">130 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+21</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Reduced Fat Salad=
+ Cheese</td>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+82</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Din=
+ner</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    775
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Baked Gnocchi Rag=
+u</td>
+    <td style=3D"padding-right: 30px;">390 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+483</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Gold Standard Whe=
+y (Double Rich Chocolate)</td>
+    <td style=3D"padding-right: 30px;">30 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+112</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Sour Cream And Ch=
+ive Large Rice And Corn Cake</td>
+    <td style=3D"padding-right: 30px;">2 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+76</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Egg, Hard Boiled<=
+/td>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+78</td>
+</tr>
+
+
+
+
+
+
+
+
+
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">=E2=9C=93 Natural=
+ Yoghurt 0% Fat</td>
+    <td style=3D"padding-right: 30px;">50 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+26</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+
+<tr>
+    <td style=3D"font-weight: bold; padding-left: 3px; border-bottom: 1px s=
+olid gray; padding-right: 30px; padding-top: 12px; margin-bottom: 4px;">Sna=
+cks</td>
+    <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; padding-r=
+ight: 3px;" colspan=3D"2" align=3D"right">
+    168
+    </td>
+</tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Chocolate Protein=
+ Pudding</td>
+    <td style=3D"padding-right: 30px;">140 Grams</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+106</td>
+</tr>
+
+
+
+
+
+
+
+
+
+    <tr>
+        <td colspan=3D"3" style=3D"font-size: .8em;">&nbsp;&nbsp;Nutrient d=
+ata missing for: Chol.</td>
+    </tr>
+<tr>
+    <td style=3D"padding-left: 3px; padding-right: 30px;">Orange, Medium</t=
+d>
+    <td style=3D"padding-right: 30px;">1 Each</td>
+    <td align=3D"right" style=3D"padding-right: 3px; padding-bottom: 2px;">=
+62</td>
+</tr>
+
+
+
+
+
+
+
+
+
+
+        <tr>
+            <td style=3D"font-weight: bold; padding-left: 3px; border-botto=
+m: 1px solid gray; padding-right: 30px; padding-top: 12px;">Exercises</td>
+            <td style=3D"border-bottom: 1px solid gray; padding-top: 8px; p=
+adding-right: 3px;" colspan=3D"2" align=3D"right">
+            0
+            </td>
+        </tr>
+    <tr>
+        <td style=3D"padding-left: 3px; padding-right: 30px;">Steps Calorie=
+ Bonus</td>
+        <td style=3D"padding-right: 30px;">0 Min</td>
+        <td align=3D"right" style=3D"padding-right: 3px;">0</td>
+    </tr>
+</table>
+
+
+	<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" style=3D"padding-b=
+ottom: 30px;">
+	<tr>
+		<td colspan=3D"2" style=3D"padding: 3px; font-weight: bold; background-co=
+lor: #e1e4ea;">Nutrient Summary</td>
+		<td style=3D" background-color: #e1e4ea; padding-right: 3px;">% Calories<=
+/td>
+	</tr>
+=09
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Fat
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		49g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+			21.4%
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+			&nbsp;&nbsp;
+			Saturated Fat
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		10g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Cholesterol
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		212mg
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Sodium
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		5,237mg
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Carbohydrates
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		251g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+			48.6%
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+			&nbsp;&nbsp;
+			Fiber
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		49g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+			&nbsp;&nbsp;
+			Sugars
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		86g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+		-
+	=09
+		</td>
+	<tr>
+		<td style=3D"padding-left: 3px; padding-right: 30px; padding-top: 3px;">=09
+		=09
+			Protein
+		</td>
+		<td style=3D"padding-right: 30px; padding-top: 3px;">
+		155g
+		</td>
+		<td style=3D"padding-right: 3px; padding-top: 3px;" align=3D"right">
+			30%
+	=09
+		</td>
+=09
+	</table>
+
+<table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" style=3D"padding-bo=
+ttom: 30px;">
+    <tr>
+        <td style=3D"padding: 3px; font-weight: bold; background-color: #e1=
+e4ea;">Goals Summary</td>
+        <td style=3D" background-color: #e1e4ea; padding-right: 3px;"></td>
+    </tr>
+
+        <tr>
+            <td style=3D"padding-left: 3px; padding-right: 30px; padding-to=
+p: 3px;">
+            Protein(g)
+            </td>
+            <td style=3D"padding-right: 30px; padding-top: 3px;">
+                155g
+            </td>
+        <tr>
+            <td style=3D"padding-left: 3px; padding-right: 30px; padding-to=
+p: 3px;">
+            Steps
+            </td>
+            <td style=3D"padding-right: 30px; padding-top: 3px;">
+                4,910
+            </td>
+
+</table>
+
+    <br/><br/><br/>
+    <div style=3D"font-size: 95%">
+        Report generated by Lose It!. For more information or to sign up fo=
+r your Lose It! account, please visit <a href=3D"https://www.loseit.com" st=
+yle=3D"color: #e69614; text-decoration: none;" target=3D"_blank">https://ww=
+w.loseit.com</a>
+        <br/><br/>
+        This email was sent to zduderman@gmail.com.<br/>
+        <a href=3D"https://www.loseit.com/unsubscribe?key=3D4_zduderman%40g=
+mail.com_39644994&verify=3DO7oRSOWKc4wbjgweUcQyJcWXPItBHYHAtTKV4xBK3M8%3D" =
+style=3D"color: #e69614; text-decoration: none;">Unsubscribe from this repo=
+rt</a><br/>
+        <a href=3D"https://www.loseit.com/unsubscribe?key=3D1_zduderman%40g=
+mail.com&verify=3DRzrdFYaxlrNV%2FV9jo5khgm1PtUWdhFN8nZK2AKaHgkc%3D" style=
+=3D"color: #e69614; text-decoration: none;">Unsubscribe from all emails</a>=
+<br/><br/>
+
+        Lose It!, Everyday Health Inc, c/o FitNow, Inc dba Lose It! 360 Par=
+k Avenue South, 17th Floor, New York, New York 10010.<br/>
+        <a href=3D"https://www.loseit.com/?tag=3Dfse" style=3D"color: #e696=
+14; text-decoration: none;" target=3D"_blank">www.loseit.com</a>
+    </div>
+</div>
+<img src=3D"http://em2.loseit.com/wf/open?upn=3Du001.TjP5eK6YcraV4OICZbZb2C=
+-2F7H4how4Fn4cbpnX4jFDKfh3vuoGwOJEPslrGTeJL6cbsJbsECV1BaeX-2BEBvJcVyyrQeG-2=
+BXzo25qbAAUyUKVrWnzSLWpZz00reozqC3YWZ5jquQ5pyWnyA-2BDHyo7w55N0hr-2FlU5lufMb=
+NW2ZJngGpI-2F4VPz7R0mp9o-2FbWFkvP0GKslenu7NXKKE0PY2EiiKxunnQ2lcxd8W-2B3lrJ4=
+vr-2Fvj5I6OIifyzgoVTZWb1-2BUR" alt=3D"" width=3D"1" height=3D"1" border=3D"=
+0" style=3D"height:1px !important;width:1px !important;border-width:0 !impo=
+rtant;margin-top:0 !important;margin-bottom:0 !important;margin-right:0 !im=
+portant;margin-left:0 !important;padding-top:0 !important;padding-bottom:0 =
+!important;padding-right:0 !important;padding-left:0 !important;"/></body>
+</html>
+
+
+
+------=_Part_41434_326377729.1756364507322--
+
+------=_Part_41433_96337609.1756364507322
+Content-Type: application/octet-stream; 
+	name="Daily Report (39644994) 20250827.csv"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; 
+	filename="Daily Report (39644994) 20250827.csv"
+
+RGF0ZSxOYW1lLEljb24sVHlwZSxRdWFudGl0eSxVbml0cyxDYWxvcmllcyxEZWxldGVkLEZhdCAo
+ZyksUHJvdGVpbiAoZyksQ2FyYm9oeWRyYXRlcyAoZyksU2F0dXJhdGVkIEZhdCAoZyksU3VnYXJz
+IChnKSxGaWJlciAoZyksQ2hvbGVzdGVyb2wgKG1nKSxTb2RpdW0gKG1nKQowOC8yNy8yMDI1LFBv
+cnJpZGdlIE9hdHMsQ2VyZWFsLEJyZWFrZmFzdCw1MC4wLEdyYW1zLDE4NSwwLDMuOTAsNiwyOS41
+MCwwLjYwLDAuNDUsNC40MCwwLDE1CjA4LzI3LzIwMjUsR29sZCBTdGFuZGFyZCBXaGV5IChEb3Vi
+bGUgUmljaCBDaG9jb2xhdGUpLFBvd2RlcmVkRHJpbmssQnJlYWtmYXN0LDMwLjAsR3JhbXMsMTEy
+LDAsMS4zOCwyMy4yMywxLjU5LDAuNTEsMC45NiwwLjY5LG4vYSwxMTYuMTMKMDgvMjcvMjAyNSxD
+aGlhIHNlZWRzLFNlZWQsQnJlYWtmYXN0LDEwLjAsR3JhbXMsNDIsMCwyLjgwLDIuNDAsMS42MCww
+LjMzLDAuNywzLjQwLG4vYSwwLjEKMDgvMjcvMjAyNSwiUmFzcGJlcnJpZXMsIFJhdyIsUmFzcGJl
+cnJ5LEJyZWFrZmFzdCwzMC4wLEdyYW1zLDI0LDAsMC4zMiwwLjU0LDUuNDAsbi9hLDEuOTgsMy4x
+NSwwLDAuNDUKMDgvMjcvMjAyNSwiQmxhY2tiZXJyeSwgUmF3IixCbGFja2JlcnJ5LEJyZWFrZmFz
+dCwzMC4wLEdyYW1zLDE1LDAsMCwwLjMwLDIuNDAsMCwyLjQwLDAsMCwwCjA4LzI3LzIwMjUsQmx1
+ZWJlcnJpZXMsQmx1ZWJlcnJ5LEJyZWFrZmFzdCw1MC4wLEdyYW1zLDIzLDAsMC4xMywwLjQ0LDQu
+NTYsMC42LDQuNTYsMC43NSwwLG4vYQowOC8yNy8yMDI1LEtlZmlyLE1pbGtTaGFrZSxCcmVha2Zh
+c3QsMjUwLjAsTWlsbGlsaXRlcnMsMTE2LDAsNS4yOCw4LjQ1LDguNDUsbi9hLG4vYSxuL2Esbi9h
+LG4vYQowOC8yNy8yMDI1LEJCUSBCYW5hbmEgQmxvc3NvbSBCdXJyaXRvLEJ1cnJpdG8sTHVuY2gs
+Mzg1LjAsR3JhbXMsMzY1LDAsNC43MCwxMy43MCw1Ny4xMCwwLjgwLDE4LjIwLDE0LjkwLG4vYSwy
+NjAwCjA4LzI3LzIwMjUsRXh0cmEgRmluZSBHcmVlbiBCZWFucyxCZWFuR3JlZW4sTHVuY2gsNDAu
+MCxHcmFtcywxMiwwLDAuMTYsMC44NCwxLjIwLDAuNCwwLjg4LDEuMzYsbi9hLG4vYQowOC8yNy8y
+MDI1LFZlZ2dpZSBDYWtlIEJlZXRyb290ICYgQmFsc2FtaWMsQmVldCxMdW5jaCwxLjAsRWFjaCw0
+MCwwLDEuMTAsMi40MCw0LjgwLDAuMTAsMC4zMCwwLjYwLG4vYSxuL2EKMDgvMjcvMjAyNSxUVlAg
+U295YSBDaHVua3MsRnJpdHRlcixMdW5jaCwzMC4wLEdyYW1zLDExMywwLDAuNDUsMTUsMTEuNzAs
+MC42LDAsMS41LG4vYSwwCjA4LzI3LzIwMjUsQmFrZWQgR25vY2NoaSBSYWd1LFBhc3RhLERpbm5l
+ciwzOTAuMCxHcmFtcyw0ODMsMCwxNS42MCwyMS41MCw1NS4zMCwxLjUwLDEzLjcwLDEwLjcwLG4v
+YSwxNjAwCjA4LzI3LzIwMjUsR29sZCBTdGFuZGFyZCBXaGV5IChEb3VibGUgUmljaCBDaG9jb2xh
+dGUpLFBvd2RlcmVkRHJpbmssRGlubmVyLDMwLjAsR3JhbXMsMTEyLDAsMS4zOCwyMy4yMywxLjU5
+LDAuNTEsMC45NiwwLjY5LG4vYSwxMTYuMTMKMDgvMjcvMjAyNSxTb3VyIENyZWFtIEFuZCBDaGl2
+ZSBMYXJnZSBSaWNlIEFuZCBDb3JuIENha2UsUmljZUNha2UsRGlubmVyLDIuMCxFYWNoLDc2LDAs
+MC42NSwxLjg5LDE3LjEsMC4xNSwwLjQ2LDAuNDIsbi9hLDk3LjI2CjA4LzI3LzIwMjUsIkVnZywg
+SGFyZCBCb2lsZWQiLEVnZyxEaW5uZXIsMS4wLEVhY2gsNzgsMCw1LDYsMSwyLDEsMCwyMTIsNjIK
+MDgvMjcvMjAyNSzinJMgTmF0dXJhbCBZb2dodXJ0IDAlIEZhdCxZb2d1cnQsRGlubmVyLDUwLjAs
+R3JhbXMsMjYsMCwwLjE1LDIuNzUsMy40MCwwLjEwLDMuNDAsMCxuL2EsOTAKMDgvMjcvMjAyNSwi
+S2l3aWZydWl0LCBaZXNwcmkgR3JlZW4sIFJhdyIsS2l3aSxNb3JuaW5nIFNuYWNrcywxLjAsRWFj
+aCwzNiwwLDAuNzQsMC43NCw2LjY2LDAsNi42NiwyLjIyLDAsMS40OAowOC8yNy8yMDI1LCJUYW5n
+ZXJpbmUsIEZsZXNoLCBSYXciLE9yYW5nZSxNb3JuaW5nIFNuYWNrcywxMDAuMCxHcmFtcywzNyww
+LDAsMSw4LG4vYSw4LDIsMCwyCjA4LzI3LzIwMjUsIlRvbWF0bywgQ2hlcnJ5LCBSYXciLFRvbWF0
+byxBZnRlcm5vb24gU25hY2tzLDEzMC4wLEdyYW1zLDIxLDAsMCwxLjMwLDIuNjAsMCwyLjYwLDAs
+MCwxMwowOC8yNy8yMDI1LFJlZHVjZWQgRmF0IFNhbGFkIENoZWVzZSxDaGVlc2UsQWZ0ZXJub29u
+IFNuYWNrcyw1MC4wLEdyYW1zLDgyLDAsNC42Nyw4LjMzLDEuNjcsMywwLjUwLDAsbi9hLDMzMy4z
+MwowOC8yNy8yMDI1LENob2NvbGF0ZSBQcm90ZWluIFB1ZGRpbmcsUHVkZGluZyxTbmFja3MsMTQw
+LjAsR3JhbXMsMTA2LDAsMC41MCwxNCwxMC4zMCwwLjMwLDYuNTAsMCxuL2EsMTkwCjA4LzI3LzIw
+MjUsIk9yYW5nZSwgTWVkaXVtIixPcmFuZ2UsU25hY2tzLDEuMCxFYWNoLDYyLDAsMC4xNiwxLjIz
+LDE1LjM5LDAuMSwxMi4yNSwzLjE0LDAsMAowOC8yNy8yMDI1LFN0ZXBzIENhbG9yaWUgQm9udXMs
+RGVmYXVsdCxFeGVyY2lzZSwwLG1pbnV0ZXMsLTAuMCwwCg==
+------=_Part_41433_96337609.1756364507322--
+

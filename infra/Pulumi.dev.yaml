@@ -1,2 +1,5 @@
 config:
   mailmunch:region: eu-west-2
+  mailmunch:sesEmailIdentity: mailmunch.co.uk
+  mailmunch:recipientAddress: reports@mailmunch.co.uk
+  mailmunch:allowedSenderDomain: loseit.com

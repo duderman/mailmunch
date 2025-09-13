@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Lambda artifact
+    name: Build Lambda artifacts
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -19,18 +19,22 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.x'
+          go-version: '1.22.x'
           cache: true
           cache-dependency-path: |
             **/go.sum
 
-      - name: Build Lambda hello
+      - name: Build Lambda email_ingest
         run: |
           chmod +x scripts/build-lambda.sh
-          ./scripts/build-lambda.sh hello dist/hello.zip
+          ./scripts/build-lambda.sh email_ingest dist/email_ingest.zip
 
-      - name: Upload lambda artifact
+      - name: Build Lambda loseit_transform
+        run: |
+          ./scripts/build-lambda.sh loseit_transform dist/loseit_transform.zip
+
+      - name: Upload lambda artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: lambda-zip
-          path: dist/hello.zip
+          name: lambda-zips
+          path: dist/*.zip
