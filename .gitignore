@@ -17,6 +17,8 @@ coverage.*
 **/dist/
 *.zip
 infra/infra
+lambda/email_ingest/email_ingest
+lambda/looseit_transform/looseit_transform
 
 # Pulumi
 **/.pulumi/
