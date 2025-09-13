@@ -517,6 +517,7 @@ func main() {
 					&ses.ReceiptRuleS3ActionArgs{
 						BucketName:      emailsBucket.Bucket,
 						ObjectKeyPrefix: pulumi.String("raw/email/incoming/"),
+						Position:        pulumi.Int(1),
 					},
 				},
 				TlsPolicy: pulumi.String("Optional"),
