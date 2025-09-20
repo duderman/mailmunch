@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	aws "github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/appconfig"
@@ -126,13 +127,22 @@ func main() {
 		if err != nil {
 			return err
 		}
+		// Read the prompt from the text file
+		promptContent, err := os.ReadFile("weekly_report_prompt.txt")
+		if err != nil {
+			return fmt.Errorf("failed to read weekly_report_prompt.txt: %w", err)
+		}
+		
+		// Create JSON configuration with the prompt
+		configJSON := fmt.Sprintf(`{
+			"weekly_report_base_prompt": %q
+		}`, string(promptContent))
+		
 		configVersion, err := appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
 			ApplicationId:          app.ID(),
 			ConfigurationProfileId: profile.ConfigurationProfileId,
-			Content: pulumi.String(`{
-				"weekly_report_base_prompt": "Please analyze my weekly food data and provide a comprehensive report with the following:\n\n1. WEEKLY SUMMARY: Compare this week's nutrition to the previous week, highlighting key changes in calories, macronutrients, and overall diet quality.\n\n2. WEIGHT LOSS RECOMMENDATIONS: Based on my food intake, suggest specific changes to support healthy weight loss including:\n   - Calorie adjustments if needed\n   - Food swaps for lower-calorie alternatives\n   - Meal timing recommendations\n   - Portion control suggestions\n\n3. MUSCLE GROWTH RECOMMENDATIONS: Analyze my protein intake and suggest improvements for muscle building:\n   - Protein targets and timing\n   - Post-workout nutrition suggestions\n   - Amino acid profile recommendations\n   - Supplement considerations if applicable\n\n4. FOOD QUALITY ANALYSIS: Evaluate the nutritional quality of my food choices:\n   - Whole food vs processed food ratio\n   - Micronutrient diversity\n   - Fiber intake adequacy\n   - Sugar and sodium levels\n\n5. ACTIONABLE NEXT WEEK PLAN: Provide 3-5 specific, actionable steps I can take next week to improve my nutrition for both weight loss and muscle growth goals.\n\nPlease be specific, evidence-based, and practical in your recommendations. Consider that I'm looking to optimize my nutrition for both fat loss and muscle gain simultaneously."
-			}`),
-			ContentType: pulumi.String("application/json"),
+			Content:                pulumi.String(configJSON),
+			ContentType:            pulumi.String("application/json"),
 		}, awsOpts)
 		if err != nil {
 			return err

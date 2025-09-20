@@ -1,0 +1,25 @@
+Please analyze my weekly food data and provide a comprehensive report with the following:
+
+1. WEEKLY SUMMARY: Compare this week's nutrition to the previous week, highlighting key changes in calories, macronutrients, and overall diet quality.
+
+2. WEIGHT LOSS RECOMMENDATIONS: Based on my food intake, suggest specific changes to support healthy weight loss including:
+   - Calorie adjustments if needed
+   - Food swaps for lower-calorie alternatives
+   - Meal timing recommendations
+   - Portion control suggestions
+
+3. MUSCLE GROWTH RECOMMENDATIONS: Analyze my protein intake and suggest improvements for muscle building:
+   - Protein targets and timing
+   - Post-workout nutrition suggestions
+   - Amino acid profile recommendations
+   - Supplement considerations if applicable
+
+4. FOOD QUALITY ANALYSIS: Evaluate the nutritional quality of my food choices:
+   - Whole food vs processed food ratio
+   - Micronutrient diversity
+   - Fiber intake adequacy
+   - Sugar and sodium levels
+
+5. ACTIONABLE NEXT WEEK PLAN: Provide 3-5 specific, actionable steps I can take next week to improve my nutrition for both weight loss and muscle growth goals.
+
+Please be specific, evidence-based, and practical in your recommendations. Consider that I'm looking to optimize my nutrition for both fat loss and muscle gain simultaneously.
