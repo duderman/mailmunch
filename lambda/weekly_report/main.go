@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/sashabaranov/go-openai"
 )
@@ -59,7 +61,7 @@ type WeeklyData struct {
 // Config holds environment variables and configuration
 type Config struct {
 	DataBucket      string
-	OpenAIAPIKey    string
+	OpenAISecretArn string
 	ReportEmail     string
 	SenderEmail     string
 	Region          string
@@ -72,12 +74,12 @@ func main() {
 
 func handler(ctx context.Context, event events.CloudWatchEvent) error {
 	config := &Config{
-		DataBucket:   getEnvOrDefault("DATA_BUCKET", ""),
-		OpenAIAPIKey: getEnvOrDefault("OPENAI_API_KEY", ""),
-		ReportEmail:  getEnvOrDefault("REPORT_EMAIL", ""),
-		SenderEmail:  getEnvOrDefault("SENDER_EMAIL", ""),
-		Region:       getEnvOrDefault("AWS_REGION", "eu-west-2"),
-		BasePrompt:   getEnvOrDefault("BASE_PROMPT", getDefaultPrompt()),
+		DataBucket:      getEnvOrDefault("DATA_BUCKET", ""),
+		OpenAISecretArn: getEnvOrDefault("OPENAI_SECRET_ARN", ""),
+		ReportEmail:     getEnvOrDefault("REPORT_EMAIL", ""),
+		SenderEmail:     getEnvOrDefault("SENDER_EMAIL", ""),
+		Region:          getEnvOrDefault("AWS_REGION", "eu-west-2"),
+		BasePrompt:      getEnvOrDefault("BASE_PROMPT", getDefaultPrompt()),
 	}
 
 	if err := validateConfig(config); err != nil {
@@ -106,6 +108,14 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 
 	s3Client := s3.New(sess)
 	sesClient := ses.New(sess)
+	secretsClient := secretsmanager.New(sess)
+
+	// Retrieve OpenAI API key from Secrets Manager
+	openaiAPIKey, err := getOpenAIAPIKey(secretsClient, config.OpenAISecretArn)
+	if err != nil {
+		log.Printf("Failed to retrieve OpenAI API key: %v", err)
+		return err
+	}
 
 	// Query data for both weeks
 	currentWeekData, err := queryWeeklyData(s3Client, config.DataBucket, currentWeekStart, currentWeekEnd)
@@ -121,7 +131,7 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 	}
 
 	// Generate OpenAI analysis
-	report, err := generateAIReport(config, currentWeekData, previousWeekData)
+	report, err := generateAIReport(openaiAPIKey, config, currentWeekData, previousWeekData)
 	if err != nil {
 		log.Printf("Failed to generate AI report: %v", err)
 		return err
@@ -149,8 +159,8 @@ func validateConfig(config *Config) error {
 	if config.DataBucket == "" {
 		return fmt.Errorf("DATA_BUCKET environment variable is required")
 	}
-	if config.OpenAIAPIKey == "" {
-		return fmt.Errorf("OPENAI_API_KEY environment variable is required")
+	if config.OpenAISecretArn == "" {
+		return fmt.Errorf("OPENAI_SECRET_ARN environment variable is required")
 	}
 	if config.ReportEmail == "" {
 		return fmt.Errorf("REPORT_EMAIL environment variable is required")
@@ -159,6 +169,34 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("SENDER_EMAIL environment variable is required")
 	}
 	return nil
+}
+
+func getOpenAIAPIKey(secretsClient *secretsmanager.SecretsManager, secretArn string) (string, error) {
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(secretArn),
+	}
+
+	result, err := secretsClient.GetSecretValue(input)
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret value: %w", err)
+	}
+
+	if result.SecretString == nil {
+		return "", fmt.Errorf("secret value is empty")
+	}
+
+	// Parse JSON if the secret is stored as JSON
+	var secretData map[string]string
+	if err := json.Unmarshal([]byte(*result.SecretString), &secretData); err == nil {
+		// If it's JSON, look for the "openai_api_key" field
+		if apiKey, exists := secretData["openai_api_key"]; exists {
+			return apiKey, nil
+		}
+		return "", fmt.Errorf("openai_api_key field not found in secret JSON")
+	}
+
+	// If it's not JSON, treat the entire secret as the API key
+	return *result.SecretString, nil
 }
 
 func londonTimeZone() *time.Location {
@@ -334,8 +372,8 @@ func parseFloat(s string) (float64, error) {
 	return f, err
 }
 
-func generateAIReport(config *Config, currentWeek, previousWeek *WeeklyData) (string, error) {
-	client := openai.NewClient(config.OpenAIAPIKey)
+func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previousWeek *WeeklyData) (string, error) {
+	client := openai.NewClient(openaiAPIKey)
 
 	// Prepare data for OpenAI
 	prompt := buildAnalysisPrompt(config.BasePrompt, currentWeek, previousWeek)

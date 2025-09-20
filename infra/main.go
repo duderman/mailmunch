@@ -361,10 +361,52 @@ func main() {
 			return err
 		}
 
-		// Get OpenAI API key from config
+		// Create OpenAI API key secret
+		openaiSecret, err := secretsmanager.NewSecret(ctx, fmt.Sprintf("%s-%s-openai-secret", project, stack), &secretsmanager.SecretArgs{
+			Description: pulumi.String("OpenAI API key for weekly nutrition reports"),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Get OpenAI API key from config and store in Secrets Manager
 		openaiApiKey := ""
 		if v, ok := ctx.GetConfig("mailmunch:openaiApiKey"); ok {
 			openaiApiKey = v
+		}
+
+		// Only create secret version if API key is provided
+		if openaiApiKey != "" {
+			_, err = secretsmanager.NewSecretVersion(ctx, fmt.Sprintf("%s-%s-openai-secret-version", project, stack), &secretsmanager.SecretVersionArgs{
+				SecretId:     openaiSecret.ID(),
+				SecretString: pulumi.String(openaiApiKey),
+			}, awsOpts)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Add Secrets Manager policy for weekly report Lambda
+		weeklyReportSecretsPolicy := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"secretsmanager:GetSecretValue",
+					}),
+					Resources: pulumi.StringArray{
+						openaiSecret.Arn,
+					},
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-secrets", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportSecretsPolicy.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
 		}
 
 		// Get email configuration
@@ -388,11 +430,11 @@ func main() {
 			Timeout:       pulumi.Int(300), // 5 minutes for OpenAI API calls
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
-					"DATA_BUCKET":    emailsBucket.Bucket,
-					"OPENAI_API_KEY": pulumi.String(openaiApiKey),
-					"REPORT_EMAIL":   pulumi.String(reportEmail),
-					"SENDER_EMAIL":   pulumi.String(senderEmail),
-					"AWS_REGION":     aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
+					"DATA_BUCKET":       emailsBucket.Bucket,
+					"OPENAI_SECRET_ARN": openaiSecret.Arn,
+					"REPORT_EMAIL":      pulumi.String(reportEmail),
+					"SENDER_EMAIL":      pulumi.String(senderEmail),
+					"AWS_REGION":        aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
 				},
 			},
 		}, awsOpts)

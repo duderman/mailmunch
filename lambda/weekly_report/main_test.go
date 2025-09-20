@@ -62,24 +62,24 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid config",
 			config: &Config{
-				DataBucket:   "test-bucket",
-				OpenAIAPIKey: "sk-test",
-				ReportEmail:  "test@example.com",
-				SenderEmail:  "sender@example.com",
+				DataBucket:      "test-bucket",
+				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
+				ReportEmail:     "test@example.com",
+				SenderEmail:     "sender@example.com",
 			},
 			wantErr: false,
 		},
 		{
 			name: "missing data bucket",
 			config: &Config{
-				OpenAIAPIKey: "sk-test",
-				ReportEmail:  "test@example.com",
-				SenderEmail:  "sender@example.com",
+				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
+				ReportEmail:     "test@example.com",
+				SenderEmail:     "sender@example.com",
 			},
 			wantErr: true,
 		},
 		{
-			name: "missing OpenAI key",
+			name: "missing OpenAI secret ARN",
 			config: &Config{
 				DataBucket:  "test-bucket",
 				ReportEmail: "test@example.com",
@@ -90,18 +90,18 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "missing report email",
 			config: &Config{
-				DataBucket:   "test-bucket",
-				OpenAIAPIKey: "sk-test",
-				SenderEmail:  "sender@example.com",
+				DataBucket:      "test-bucket",
+				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
+				SenderEmail:     "sender@example.com",
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing sender email",
 			config: &Config{
-				DataBucket:   "test-bucket",
-				OpenAIAPIKey: "sk-test",
-				ReportEmail:  "test@example.com",
+				DataBucket:      "test-bucket",
+				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
+				ReportEmail:     "test@example.com",
 			},
 			wantErr: true,
 		},
@@ -202,4 +202,20 @@ func containsSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestGetOpenAIAPIKeyFunctionExists(t *testing.T) {
+	// This test just checks that the function exists and has the right signature
+	// We can't easily test the actual AWS Secrets Manager integration without mocking
+	
+	// Verify the function signature exists by attempting to call it with nil
+	// This will panic but confirms the function signature is correct
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic when calling getOpenAIAPIKey with nil client")
+		}
+	}()
+	
+	// This should panic since we're passing nil
+	_, _ = getOpenAIAPIKey(nil, "test-arn")
 }
