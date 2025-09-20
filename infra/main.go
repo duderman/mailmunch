@@ -193,14 +193,14 @@ func main() {
 						"s3:GetObject",
 						"s3:PutObject",
 					},
-					Resources: []string{"arn:aws:s3:::" + fmt.Sprintf("%s-data-*", fmt.Sprintf("%s-%s", project, stack)) + "/*"},
+					Resources: []string{"arn:aws:s3:::" + dataBucketName + "/*"},
 				},
 				{
 					Effect: pulumi.StringRef("Allow"),
 					Actions: []string{
 						"s3:ListBucket",
 					},
-					Resources: []string{"arn:aws:s3:::" + fmt.Sprintf("%s-data-*", fmt.Sprintf("%s-%s", project, stack))},
+					Resources: []string{"arn:aws:s3:::" + dataBucketName},
 				},
 			},
 		}, nil)
@@ -415,14 +415,14 @@ func main() {
 						"s3:GetObject",
 						"s3:PutObject",
 					},
-					Resources: []string{"arn:aws:s3:::" + fmt.Sprintf("%s-data-*", fmt.Sprintf("%s-%s", project, stack)) + "/*"},
+					Resources: []string{"arn:aws:s3:::" + dataBucketName + "/*"},
 				},
 				{
 					Effect: pulumi.StringRef("Allow"),
 					Actions: []string{
 						"s3:ListBucket",
 					},
-					Resources: []string{"arn:aws:s3:::" + fmt.Sprintf("%s-data-*", fmt.Sprintf("%s-%s", project, stack))},
+					Resources: []string{"arn:aws:s3:::" + dataBucketName},
 				},
 			},
 		}, nil)
