@@ -132,12 +132,12 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("failed to read weekly_report_prompt.txt: %w", err)
 		}
-		
+
 		// Create JSON configuration with the prompt
 		configJSON := fmt.Sprintf(`{
 			"weekly_report_base_prompt": %q
 		}`, string(promptContent))
-		
+
 		configVersion, err := appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
 			ApplicationId:          app.ID(),
 			ConfigurationProfileId: profile.ConfigurationProfileId,
