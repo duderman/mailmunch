@@ -38,17 +38,16 @@ type WeeklyData struct {
 
 // Config holds environment variables and configuration
 type Config struct {
-	DataBucket          string
-	OpenAISecretArn     string
-	ReportEmail         string
-	SenderEmail         string
-	Region              string
-	BasePrompt          string
-	AthenaDatabase      string
-	AthenaWorkgroup     string
-	AthenaResultsBucket string
-	AppConfigApplication string
-	AppConfigEnvironment string
+	OpenAISecretArn        string
+	ReportEmail            string
+	SenderEmail            string
+	Region                 string
+	BasePrompt             string
+	AthenaDatabase         string
+	AthenaWorkgroup        string
+	AthenaResultsBucket    string
+	AppConfigApplication   string
+	AppConfigEnvironment   string
 	AppConfigConfiguration string
 }
 
@@ -58,7 +57,6 @@ func main() {
 
 func handler(ctx context.Context, event events.CloudWatchEvent) error {
 	config := &Config{
-		DataBucket:             getEnvOrDefault("DATA_BUCKET", ""),
 		OpenAISecretArn:        getEnvOrDefault("OPENAI_SECRET_ARN", ""),
 		ReportEmail:            getEnvOrDefault("REPORT_EMAIL", ""),
 		SenderEmail:            getEnvOrDefault("SENDER_EMAIL", ""),
@@ -153,9 +151,6 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 
 func validateConfig(config *Config) error {
-	if config.DataBucket == "" {
-		return fmt.Errorf("DATA_BUCKET environment variable is required")
-	}
 	if config.OpenAISecretArn == "" {
 		return fmt.Errorf("OPENAI_SECRET_ARN environment variable is required")
 	}

@@ -520,7 +520,6 @@ func main() {
 			Timeout:       pulumi.Int(300), // 5 minutes for OpenAI API calls
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
-					"DATA_BUCKET":                emailsBucket.Bucket,
 					"OPENAI_SECRET_ARN":          openaiSecret.Arn,
 					"REPORT_EMAIL":               pulumi.String(reportEmail),
 					"SENDER_EMAIL":               pulumi.String(senderEmail),

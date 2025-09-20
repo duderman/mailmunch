@@ -62,7 +62,6 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid config",
 			config: &Config{
-				DataBucket:             "test-bucket",
 				OpenAISecretArn:        "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
 				ReportEmail:            "test@example.com",
 				SenderEmail:            "sender@example.com",
@@ -73,18 +72,8 @@ func TestValidateConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "missing data bucket",
-			config: &Config{
-				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
-				ReportEmail:     "test@example.com",
-				SenderEmail:     "sender@example.com",
-			},
-			wantErr: true,
-		},
-		{
 			name: "missing OpenAI secret ARN",
 			config: &Config{
-				DataBucket:  "test-bucket",
 				ReportEmail: "test@example.com",
 				SenderEmail: "sender@example.com",
 			},
@@ -93,7 +82,6 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "missing report email",
 			config: &Config{
-				DataBucket:      "test-bucket",
 				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
 				SenderEmail:     "sender@example.com",
 			},
@@ -102,7 +90,6 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "missing sender email",
 			config: &Config{
-				DataBucket:      "test-bucket",
 				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
 				ReportEmail:     "test@example.com",
 			},
