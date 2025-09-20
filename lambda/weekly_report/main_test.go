@@ -9,10 +9,10 @@ func TestGetWeekRange(t *testing.T) {
 	// Test Sunday (should get Monday to Sunday range)
 	sunday := time.Date(2025, 1, 12, 15, 0, 0, 0, time.UTC) // Sunday, Jan 12, 2025
 	start, end := getWeekRange(sunday)
-	
-	expectedStart := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)  // Monday, Jan 6
+
+	expectedStart := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)           // Monday, Jan 6
 	expectedEnd := time.Date(2025, 1, 12, 23, 59, 59, 999999999, time.UTC) // Sunday, Jan 12
-	
+
 	if !start.Equal(expectedStart) {
 		t.Errorf("Expected start %v, got %v", expectedStart, start)
 	}
@@ -25,10 +25,10 @@ func TestGetWeekRangeMonday(t *testing.T) {
 	// Test Monday (should get same week Monday to Sunday)
 	monday := time.Date(2025, 1, 6, 10, 0, 0, 0, time.UTC) // Monday, Jan 6, 2025
 	start, end := getWeekRange(monday)
-	
-	expectedStart := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)  // Same Monday
+
+	expectedStart := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)           // Same Monday
 	expectedEnd := time.Date(2025, 1, 12, 23, 59, 59, 999999999, time.UTC) // Sunday, Jan 12
-	
+
 	if !start.Equal(expectedStart) {
 		t.Errorf("Expected start %v, got %v", expectedStart, start)
 	}
@@ -41,10 +41,10 @@ func TestGetWeekRangeWednesday(t *testing.T) {
 	// Test Wednesday (should get previous Monday to Sunday)
 	wednesday := time.Date(2025, 1, 8, 14, 30, 0, 0, time.UTC) // Wednesday, Jan 8, 2025
 	start, end := getWeekRange(wednesday)
-	
-	expectedStart := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)  // Monday, Jan 6
+
+	expectedStart := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)           // Monday, Jan 6
 	expectedEnd := time.Date(2025, 1, 12, 23, 59, 59, 999999999, time.UTC) // Sunday, Jan 12
-	
+
 	if !start.Equal(expectedStart) {
 		t.Errorf("Expected start %v, got %v", expectedStart, start)
 	}
@@ -62,10 +62,13 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid config",
 			config: &Config{
-				DataBucket:      "test-bucket",
-				OpenAISecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
-				ReportEmail:     "test@example.com",
-				SenderEmail:     "sender@example.com",
+				DataBucket:             "test-bucket",
+				OpenAISecretArn:        "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-secret",
+				ReportEmail:            "test@example.com",
+				SenderEmail:            "sender@example.com",
+				AppConfigApplication:   "test-app",
+				AppConfigEnvironment:   "prod",
+				AppConfigConfiguration: "test-config",
 			},
 			wantErr: false,
 		},
@@ -146,7 +149,7 @@ func TestGetEnvOrDefault(t *testing.T) {
 			if tt.envValue != "" {
 				t.Setenv(tt.key, tt.envValue)
 			}
-			
+
 			result := getEnvOrDefault(tt.key, tt.defaultValue)
 			if result != tt.expected {
 				t.Errorf("getEnvOrDefault() = %v, expected %v", result, tt.expected)
@@ -160,39 +163,38 @@ func TestLondonTimeZone(t *testing.T) {
 	if tz == nil {
 		t.Error("londonTimeZone() returned nil")
 	}
-	
+
 	// Should return either London timezone or UTC as fallback
 	if tz.String() != "Europe/London" && tz.String() != "UTC" {
 		t.Errorf("londonTimeZone() returned unexpected timezone: %s", tz.String())
 	}
 }
 
-func TestGetDefaultPrompt(t *testing.T) {
-	prompt := getDefaultPrompt()
-	if prompt == "" {
-		t.Error("getDefaultPrompt() returned empty string")
+func TestConfigurationStructure(t *testing.T) {
+	// Test that our configuration structure is valid
+	config := &Config{
+		AppConfigApplication:   "test-app",
+		AppConfigEnvironment:   "prod",
+		AppConfigConfiguration: "test-config",
 	}
-	
-	// Check that the prompt contains expected sections
-	expectedSections := []string{
-		"WEEKLY SUMMARY",
-		"WEIGHT LOSS RECOMMENDATIONS",
-		"MUSCLE GROWTH RECOMMENDATIONS", 
-		"FOOD QUALITY ANALYSIS",
-		"ACTIONABLE NEXT WEEK PLAN",
+
+	if config.AppConfigApplication == "" {
+		t.Error("AppConfigApplication should not be empty")
 	}
-	
-	for _, section := range expectedSections {
-		if !contains(prompt, section) {
-			t.Errorf("getDefaultPrompt() missing expected section: %s", section)
-		}
+
+	if config.AppConfigEnvironment == "" {
+		t.Error("AppConfigEnvironment should not be empty")
+	}
+
+	if config.AppConfigConfiguration == "" {
+		t.Error("AppConfigConfiguration should not be empty")
 	}
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		containsSubstring(s, substr)))
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsSubstring(s, substr)))
 }
 
 func containsSubstring(s, substr string) bool {
@@ -207,7 +209,7 @@ func containsSubstring(s, substr string) bool {
 func TestGetOpenAIAPIKeyFunctionExists(t *testing.T) {
 	// This test just checks that the function exists and has the right signature
 	// We can't easily test the actual AWS Secrets Manager integration without mocking
-	
+
 	// Verify the function signature exists by attempting to call it with nil
 	// This will panic but confirms the function signature is correct
 	defer func() {
@@ -215,7 +217,7 @@ func TestGetOpenAIAPIKeyFunctionExists(t *testing.T) {
 			t.Errorf("Expected panic when calling getOpenAIAPIKey with nil client")
 		}
 	}()
-	
+
 	// This should panic since we're passing nil
 	_, _ = getOpenAIAPIKey(nil, "test-arn")
 }

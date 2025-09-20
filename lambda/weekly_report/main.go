@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -15,7 +14,8 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/appconfigdata"
+	"github.com/aws/aws-sdk-go/service/athena"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/sashabaranov/go-openai"
@@ -23,49 +23,33 @@ import (
 
 // WeeklyReportEvent represents the EventBridge event that triggers this Lambda
 type WeeklyReportEvent struct {
-	Source      string    `json:"source"`
-	DetailType  string    `json:"detail-type"`
-	Detail      any       `json:"detail"`
-	Time        time.Time `json:"time"`
+	Source     string    `json:"source"`
+	DetailType string    `json:"detail-type"`
+	Detail     any       `json:"detail"`
+	Time       time.Time `json:"time"`
 }
 
-// FoodEntry represents a single food log entry
-type FoodEntry struct {
-	Date        string  `json:"date"`
-	FoodName    string  `json:"food_name"`
-	Quantity    float64 `json:"quantity"`
-	Unit        string  `json:"unit"`
-	Calories    float64 `json:"calories"`
-	Protein     float64 `json:"protein"`
-	Carbs       float64 `json:"carbs"`
-	Fat         float64 `json:"fat"`
-	Fiber       float64 `json:"fiber"`
-	Sugar       float64 `json:"sugar"`
-	Sodium      float64 `json:"sodium"`
-}
-
-// WeeklyData represents aggregated data for a week
+// WeeklyData represents raw food data for a week period
 type WeeklyData struct {
-	StartDate     string      `json:"start_date"`
-	EndDate       string      `json:"end_date"`
-	TotalCalories float64     `json:"total_calories"`
-	TotalProtein  float64     `json:"total_protein"`
-	TotalCarbs    float64     `json:"total_carbs"`
-	TotalFat      float64     `json:"total_fat"`
-	TotalFiber    float64     `json:"total_fiber"`
-	TotalSugar    float64     `json:"total_sugar"`
-	TotalSodium   float64     `json:"total_sodium"`
-	DailyEntries  []FoodEntry `json:"daily_entries"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+	RawData   string `json:"raw_data"` // Raw CSV-like data from Athena query
 }
 
 // Config holds environment variables and configuration
 type Config struct {
-	DataBucket      string
-	OpenAISecretArn string
-	ReportEmail     string
-	SenderEmail     string
-	Region          string
-	BasePrompt      string
+	DataBucket          string
+	OpenAISecretArn     string
+	ReportEmail         string
+	SenderEmail         string
+	Region              string
+	BasePrompt          string
+	AthenaDatabase      string
+	AthenaWorkgroup     string
+	AthenaResultsBucket string
+	AppConfigApplication string
+	AppConfigEnvironment string
+	AppConfigConfiguration string
 }
 
 func main() {
@@ -74,12 +58,17 @@ func main() {
 
 func handler(ctx context.Context, event events.CloudWatchEvent) error {
 	config := &Config{
-		DataBucket:      getEnvOrDefault("DATA_BUCKET", ""),
-		OpenAISecretArn: getEnvOrDefault("OPENAI_SECRET_ARN", ""),
-		ReportEmail:     getEnvOrDefault("REPORT_EMAIL", ""),
-		SenderEmail:     getEnvOrDefault("SENDER_EMAIL", ""),
-		Region:          getEnvOrDefault("AWS_REGION", "eu-west-2"),
-		BasePrompt:      getEnvOrDefault("BASE_PROMPT", getDefaultPrompt()),
+		DataBucket:             getEnvOrDefault("DATA_BUCKET", ""),
+		OpenAISecretArn:        getEnvOrDefault("OPENAI_SECRET_ARN", ""),
+		ReportEmail:            getEnvOrDefault("REPORT_EMAIL", ""),
+		SenderEmail:            getEnvOrDefault("SENDER_EMAIL", ""),
+		Region:                 getEnvOrDefault("AWS_REGION", "eu-west-2"),
+		AthenaDatabase:         getEnvOrDefault("ATHENA_DATABASE", "mailmunch_dev_db"),
+		AthenaWorkgroup:        getEnvOrDefault("ATHENA_WORKGROUP", "primary"),
+		AthenaResultsBucket:    getEnvOrDefault("ATHENA_RESULTS_BUCKET", ""),
+		AppConfigApplication:   getEnvOrDefault("APPCONFIG_APPLICATION", ""),
+		AppConfigEnvironment:   getEnvOrDefault("APPCONFIG_ENVIRONMENT", ""),
+		AppConfigConfiguration: getEnvOrDefault("APPCONFIG_CONFIGURATION", ""),
 	}
 
 	if err := validateConfig(config); err != nil {
@@ -106,9 +95,17 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 		return err
 	}
 
-	s3Client := s3.New(sess)
 	sesClient := ses.New(sess)
 	secretsClient := secretsmanager.New(sess)
+	athenaClient := athena.New(sess)
+	appConfigClient := appconfigdata.New(sess)
+
+	// Get prompt configuration from AppConfig
+	config.BasePrompt, err = getPromptFromAppConfig(appConfigClient, config)
+	if err != nil {
+		log.Printf("Failed to retrieve prompt from AppConfig: %v", err)
+		return err
+	}
 
 	// Retrieve OpenAI API key from Secrets Manager
 	openaiAPIKey, err := getOpenAIAPIKey(secretsClient, config.OpenAISecretArn)
@@ -117,14 +114,14 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 		return err
 	}
 
-	// Query data for both weeks
-	currentWeekData, err := queryWeeklyData(s3Client, config.DataBucket, currentWeekStart, currentWeekEnd)
+	// Query data for both weeks using Athena
+	currentWeekData, err := queryWeeklyDataWithAthena(ctx, athenaClient, config, currentWeekStart, currentWeekEnd)
 	if err != nil {
 		log.Printf("Failed to query current week data: %v", err)
 		return err
 	}
 
-	previousWeekData, err := queryWeeklyData(s3Client, config.DataBucket, previousWeekStart, previousWeekEnd)
+	previousWeekData, err := queryWeeklyDataWithAthena(ctx, athenaClient, config, previousWeekStart, previousWeekEnd)
 	if err != nil {
 		log.Printf("Failed to query previous week data: %v", err)
 		return err
@@ -168,6 +165,15 @@ func validateConfig(config *Config) error {
 	if config.SenderEmail == "" {
 		return fmt.Errorf("SENDER_EMAIL environment variable is required")
 	}
+	if config.AppConfigApplication == "" {
+		return fmt.Errorf("APPCONFIG_APPLICATION environment variable is required")
+	}
+	if config.AppConfigEnvironment == "" {
+		return fmt.Errorf("APPCONFIG_ENVIRONMENT environment variable is required")
+	}
+	if config.AppConfigConfiguration == "" {
+		return fmt.Errorf("APPCONFIG_CONFIGURATION environment variable is required")
+	}
 	return nil
 }
 
@@ -199,6 +205,43 @@ func getOpenAIAPIKey(secretsClient *secretsmanager.SecretsManager, secretArn str
 	return *result.SecretString, nil
 }
 
+func getPromptFromAppConfig(appConfigClient *appconfigdata.AppConfigData, config *Config) (string, error) {
+	// Start a configuration session
+	sessionInput := &appconfigdata.StartConfigurationSessionInput{
+		ApplicationIdentifier:          aws.String(config.AppConfigApplication),
+		EnvironmentIdentifier:          aws.String(config.AppConfigEnvironment),
+		ConfigurationProfileIdentifier: aws.String(config.AppConfigConfiguration),
+	}
+
+	sessionResult, err := appConfigClient.StartConfigurationSession(sessionInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to start configuration session: %w", err)
+	}
+
+	// Get the latest configuration
+	configInput := &appconfigdata.GetLatestConfigurationInput{
+		ConfigurationToken: sessionResult.InitialConfigurationToken,
+	}
+
+	result, err := appConfigClient.GetLatestConfiguration(configInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest configuration from AppConfig: %w", err)
+	}
+
+	// Parse the JSON configuration
+	var configData map[string]string
+	if err := json.Unmarshal(result.Configuration, &configData); err != nil {
+		return "", fmt.Errorf("failed to parse AppConfig content as JSON: %w", err)
+	}
+
+	// Look for the weekly_report_base_prompt field
+	if prompt, exists := configData["weekly_report_base_prompt"]; exists {
+		return prompt, nil
+	}
+
+	return "", fmt.Errorf("weekly_report_base_prompt field not found in AppConfig")
+}
+
 func londonTimeZone() *time.Location {
 	loc, err := time.LoadLocation("Europe/London")
 	if err != nil {
@@ -215,161 +258,94 @@ func getWeekRange(date time.Time) (start, end time.Time) {
 	if weekday == time.Sunday {
 		daysFromMonday = 6 // Sunday is -1 day from Monday, so we go back 6 days
 	}
-	
+
 	start = date.AddDate(0, 0, -daysFromMonday)
 	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
-	
+
 	end = start.AddDate(0, 0, 6)
 	end = time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, end.Location())
-	
+
 	return start, end
 }
 
-func queryWeeklyData(s3Client *s3.S3, bucket string, startDate, endDate time.Time) (*WeeklyData, error) {
-	log.Printf("Querying data from %s to %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	
-	weeklyData := &WeeklyData{
-		StartDate:    startDate.Format("2006-01-02"),
-		EndDate:      endDate.Format("2006-01-02"),
-		DailyEntries: []FoodEntry{},
+// queryWeeklyDataWithAthena executes an Athena query to get raw food data for the specified week
+func queryWeeklyDataWithAthena(ctx context.Context, athenaClient *athena.Athena, config *Config, startDate, endDate time.Time) (*WeeklyData, error) {
+	query := fmt.Sprintf(`
+		SELECT date, food_name, quantity, unit, calories, protein, carbs, fat, fiber, sugar, sodium
+		FROM %s.food_entries
+		WHERE date >= '%s' AND date <= '%s'
+		ORDER BY date, food_name
+	`, config.AthenaDatabase, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+
+	// Start query execution
+	queryExecution, err := athenaClient.StartQueryExecutionWithContext(ctx, &athena.StartQueryExecutionInput{
+		QueryString: aws.String(query),
+		WorkGroup:   aws.String(config.AthenaWorkgroup),
+		ResultConfiguration: &athena.ResultConfiguration{
+			OutputLocation: aws.String(fmt.Sprintf("s3://%s/athena-results/", config.AthenaResultsBucket)),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start Athena query execution: %v", err)
 	}
 
-	// Iterate through each day in the week
-	currentDate := startDate
-	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
-		dateStr := currentDate.Format("2006-01-02")
-		
-		// Query CSV files for this date from the curated data
-		prefix := fmt.Sprintf("curated/loseit_csv/year=%d/month=%02d/day=%02d/",
-			currentDate.Year(), currentDate.Month(), currentDate.Day())
-		
-		log.Printf("Searching for data with prefix: %s", prefix)
-		
-		input := &s3.ListObjectsV2Input{
-			Bucket: aws.String(bucket),
-			Prefix: aws.String(prefix),
-		}
-
-		result, err := s3Client.ListObjectsV2(input)
+	// Wait for query to complete
+	queryExecutionID := *queryExecution.QueryExecutionId
+	for {
+		result, err := athenaClient.GetQueryExecutionWithContext(ctx, &athena.GetQueryExecutionInput{
+			QueryExecutionId: aws.String(queryExecutionID),
+		})
 		if err != nil {
-			log.Printf("Warning: Failed to list objects for %s: %v", dateStr, err)
-			currentDate = currentDate.AddDate(0, 0, 1)
-			continue
+			return nil, fmt.Errorf("failed to get query execution status: %v", err)
 		}
 
-		// Process each CSV file found for this date
-		for _, obj := range result.Contents {
-			entries, err := readCSVFromS3(s3Client, bucket, *obj.Key)
-			if err != nil {
-				log.Printf("Warning: Failed to read CSV %s: %v", *obj.Key, err)
-				continue
-			}
-
-			for _, entry := range entries {
-				entry.Date = dateStr // Ensure consistent date format
-				weeklyData.DailyEntries = append(weeklyData.DailyEntries, entry)
-				
-				// Aggregate totals
-				weeklyData.TotalCalories += entry.Calories
-				weeklyData.TotalProtein += entry.Protein
-				weeklyData.TotalCarbs += entry.Carbs
-				weeklyData.TotalFat += entry.Fat
-				weeklyData.TotalFiber += entry.Fiber
-				weeklyData.TotalSugar += entry.Sugar
-				weeklyData.TotalSodium += entry.Sodium
-			}
+		status := *result.QueryExecution.Status.State
+		if status == athena.QueryExecutionStateSucceeded {
+			break
+		} else if status == athena.QueryExecutionStateFailed || status == athena.QueryExecutionStateCancelled {
+			return nil, fmt.Errorf("query execution failed with status: %s", status)
 		}
 
-		currentDate = currentDate.AddDate(0, 0, 1)
+		// Wait before checking again
+		time.Sleep(2 * time.Second)
 	}
 
-	log.Printf("Found %d food entries for week %s to %s", 
-		len(weeklyData.DailyEntries), weeklyData.StartDate, weeklyData.EndDate)
-	
-	return weeklyData, nil
-}
-
-func readCSVFromS3(s3Client *s3.S3, bucket, key string) ([]FoodEntry, error) {
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	}
-
-	result, err := s3Client.GetObject(input)
+	// Get query results
+	results, err := athenaClient.GetQueryResultsWithContext(ctx, &athena.GetQueryResultsInput{
+		QueryExecutionId: aws.String(queryExecutionID),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get object %s: %w", key, err)
-	}
-	defer result.Body.Close()
-
-	reader := csv.NewReader(result.Body)
-	records, err := reader.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV: %w", err)
+		return nil, fmt.Errorf("failed to get query results: %v", err)
 	}
 
-	if len(records) == 0 {
-		return []FoodEntry{}, nil
-	}
+	// Convert results to CSV-like format for OpenAI
+	var rawData strings.Builder
 
-	// Skip header row
-	entries := make([]FoodEntry, 0, len(records)-1)
-	for i, record := range records {
+	// Add header row
+	rawData.WriteString("date,food_name,quantity,unit,calories,protein,carbs,fat,fiber,sugar,sodium\n")
+
+	// Skip header row in results and add data rows
+	for i, row := range results.ResultSet.Rows {
 		if i == 0 {
-			continue // Skip header
+			continue // Skip header row
 		}
 
-		if len(record) < 10 {
-			log.Printf("Warning: Skipping malformed CSV record with %d fields", len(record))
-			continue
-		}
-
-		entry := FoodEntry{
-			FoodName: record[1],
-			Unit:     record[3],
-		}
-
-		// Parse numeric fields with error handling
-		if val, err := parseFloat(record[2]); err == nil {
-			entry.Quantity = val
-		}
-		if val, err := parseFloat(record[4]); err == nil {
-			entry.Calories = val
-		}
-		if val, err := parseFloat(record[5]); err == nil {
-			entry.Protein = val
-		}
-		if val, err := parseFloat(record[6]); err == nil {
-			entry.Carbs = val
-		}
-		if val, err := parseFloat(record[7]); err == nil {
-			entry.Fat = val
-		}
-		if val, err := parseFloat(record[8]); err == nil {
-			entry.Fiber = val
-		}
-		if val, err := parseFloat(record[9]); err == nil {
-			entry.Sugar = val
-		}
-		if len(record) > 10 {
-			if val, err := parseFloat(record[10]); err == nil {
-				entry.Sodium = val
+		var values []string
+		for _, col := range row.Data {
+			if col.VarCharValue != nil {
+				values = append(values, *col.VarCharValue)
+			} else {
+				values = append(values, "")
 			}
 		}
-
-		entries = append(entries, entry)
+		rawData.WriteString(strings.Join(values, ",") + "\n")
 	}
 
-	return entries, nil
-}
-
-func parseFloat(s string) (float64, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, nil
-	}
-	var f float64
-	_, err := fmt.Sscanf(s, "%f", &f)
-	return f, err
+	return &WeeklyData{
+		StartDate: startDate.Format("2006-01-02"),
+		EndDate:   endDate.Format("2006-01-02"),
+		RawData:   rawData.String(),
+	}, nil
 }
 
 func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previousWeek *WeeklyData) (string, error) {
@@ -409,7 +385,7 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 
 	analysis := resp.Choices[0].Message.Content
 	log.Printf("Received %d chars analysis from OpenAI", len(analysis))
-	
+
 	return analysis, nil
 }
 
@@ -419,80 +395,24 @@ func buildAnalysisPrompt(basePrompt string, currentWeek, previousWeek *WeeklyDat
 	builder.WriteString(basePrompt)
 	builder.WriteString("\n\n")
 
-	// Current week summary
-	builder.WriteString("## CURRENT WEEK DATA (" + currentWeek.StartDate + " to " + currentWeek.EndDate + "):\n")
-	builder.WriteString(fmt.Sprintf("Total Calories: %.1f\n", currentWeek.TotalCalories))
-	builder.WriteString(fmt.Sprintf("Total Protein: %.1fg\n", currentWeek.TotalProtein))
-	builder.WriteString(fmt.Sprintf("Total Carbs: %.1fg\n", currentWeek.TotalCarbs))
-	builder.WriteString(fmt.Sprintf("Total Fat: %.1fg\n", currentWeek.TotalFat))
-	builder.WriteString(fmt.Sprintf("Total Fiber: %.1fg\n", currentWeek.TotalFiber))
-	builder.WriteString(fmt.Sprintf("Average daily calories: %.1f\n", currentWeek.TotalCalories/7))
-	builder.WriteString(fmt.Sprintf("Number of food entries: %d\n\n", len(currentWeek.DailyEntries)))
+	// Current week raw data
+	builder.WriteString("## CURRENT WEEK RAW DATA (" + currentWeek.StartDate + " to " + currentWeek.EndDate + "):\n")
+	builder.WriteString("```csv\n")
+	builder.WriteString(currentWeek.RawData)
+	builder.WriteString("```\n\n")
 
-	// Previous week comparison
-	builder.WriteString("## PREVIOUS WEEK DATA (" + previousWeek.StartDate + " to " + previousWeek.EndDate + "):\n")
-	builder.WriteString(fmt.Sprintf("Total Calories: %.1f\n", previousWeek.TotalCalories))
-	builder.WriteString(fmt.Sprintf("Total Protein: %.1fg\n", previousWeek.TotalProtein))
-	builder.WriteString(fmt.Sprintf("Total Carbs: %.1fg\n", previousWeek.TotalCarbs))
-	builder.WriteString(fmt.Sprintf("Total Fat: %.1fg\n", previousWeek.TotalFat))
-	builder.WriteString(fmt.Sprintf("Total Fiber: %.1fg\n", previousWeek.TotalFiber))
-	builder.WriteString(fmt.Sprintf("Average daily calories: %.1f\n", previousWeek.TotalCalories/7))
-	builder.WriteString(fmt.Sprintf("Number of food entries: %d\n\n", len(previousWeek.DailyEntries)))
+	// Previous week raw data for comparison
+	builder.WriteString("## PREVIOUS WEEK RAW DATA (" + previousWeek.StartDate + " to " + previousWeek.EndDate + "):\n")
+	builder.WriteString("```csv\n")
+	builder.WriteString(previousWeek.RawData)
+	builder.WriteString("```\n\n")
 
-	// Daily breakdown for current week (top foods)
-	builder.WriteString("## CURRENT WEEK FOOD DETAILS:\n")
-	dailyBreakdown := make(map[string][]FoodEntry)
-	for _, entry := range currentWeek.DailyEntries {
-		dailyBreakdown[entry.Date] = append(dailyBreakdown[entry.Date], entry)
-	}
-
-	// Sort dates
-	dates := make([]string, 0, len(dailyBreakdown))
-	for date := range dailyBreakdown {
-		dates = append(dates, date)
-	}
-	sort.Strings(dates)
-
-	for _, date := range dates {
-		entries := dailyBreakdown[date]
-		dailyCalories := 0.0
-		for _, entry := range entries {
-			dailyCalories += entry.Calories
-		}
-		
-		builder.WriteString(fmt.Sprintf("%s (%.0f calories):\n", date, dailyCalories))
-		
-		// Sort entries by calories to show most significant foods
-		sort.Slice(entries, func(i, j int) bool {
-			return entries[i].Calories > entries[j].Calories
-		})
-		
-		// Show top 5 foods for the day
-		maxEntries := 5
-		if len(entries) < maxEntries {
-			maxEntries = len(entries)
-		}
-		
-		for i := 0; i < maxEntries; i++ {
-			entry := entries[i]
-			builder.WriteString(fmt.Sprintf("  - %s: %.1f cal, %.1fg protein, %.1fg carbs, %.1fg fat\n",
-				entry.FoodName, entry.Calories, entry.Protein, entry.Carbs, entry.Fat))
-		}
-		
-		if len(entries) > maxEntries {
-			builder.WriteString(fmt.Sprintf("  ... and %d more items\n", len(entries)-maxEntries))
-		}
-		builder.WriteString("\n")
-	}
-
-	builder.WriteString("\nPlease analyze this data and provide detailed recommendations for weight loss and muscle growth.")
-	
 	return builder.String()
 }
 
 func sendEmailReport(sesClient *ses.SES, config *Config, analysis string, currentWeek, previousWeek *WeeklyData) error {
 	subject := fmt.Sprintf("Weekly Nutrition Report - %s to %s", currentWeek.StartDate, currentWeek.EndDate)
-	
+
 	htmlBody := buildHTMLEmail(analysis, currentWeek, previousWeek)
 	textBody := buildTextEmail(analysis, currentWeek, previousWeek)
 
@@ -527,10 +447,14 @@ func sendEmailReport(sesClient *ses.SES, config *Config, analysis string, curren
 	return nil
 }
 
-func buildHTMLEmail(analysis string, currentWeek, previousWeek *WeeklyData) string {
-	var builder strings.Builder
+type EmailData struct {
+	CurrentWeek  *WeeklyData
+	PreviousWeek *WeeklyData
+	Analysis     string
+}
 
-	builder.WriteString(`<!DOCTYPE html>
+func buildHTMLEmail(analysis string, currentWeek, previousWeek *WeeklyData) string {
+	const htmlTemplate = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -551,40 +475,89 @@ func buildHTMLEmail(analysis string, currentWeek, previousWeek *WeeklyData) stri
     <div class="container">
         <div class="header">
             <h1>Weekly Nutrition Report</h1>
-            <p>` + currentWeek.StartDate + ` to ` + currentWeek.EndDate + `</p>
+            <p>{{.CurrentWeek.StartDate}} to {{.CurrentWeek.EndDate}}</p>
         </div>
-        
+
         <div class="summary">
             <div class="week-card">
-                <h3>Current Week</h3>
+                <h3>Current Week ({{.CurrentWeek.StartDate}} to {{.CurrentWeek.EndDate}})</h3>
                 <div class="metrics">
-                    <div class="metric"><strong>Total Calories:</strong> ` + fmt.Sprintf("%.0f", currentWeek.TotalCalories) + `</div>
-                    <div class="metric"><strong>Avg Daily:</strong> ` + fmt.Sprintf("%.0f", currentWeek.TotalCalories/7) + ` cal</div>
-                    <div class="metric"><strong>Protein:</strong> ` + fmt.Sprintf("%.1f", currentWeek.TotalProtein) + `g</div>
-                    <div class="metric"><strong>Carbs:</strong> ` + fmt.Sprintf("%.1f", currentWeek.TotalCarbs) + `g</div>
-                    <div class="metric"><strong>Fat:</strong> ` + fmt.Sprintf("%.1f", currentWeek.TotalFat) + `g</div>
-                    <div class="metric"><strong>Fiber:</strong> ` + fmt.Sprintf("%.1f", currentWeek.TotalFiber) + `g</div>
+                    <div class="metric">Raw food data has been analyzed by AI below</div>
                 </div>
             </div>
-            
+
             <div class="week-card">
-                <h3>Previous Week</h3>
+                <h3>Previous Week ({{.PreviousWeek.StartDate}} to {{.PreviousWeek.EndDate}})</h3>
                 <div class="metrics">
-                    <div class="metric"><strong>Total Calories:</strong> ` + fmt.Sprintf("%.0f", previousWeek.TotalCalories) + `</div>
-                    <div class="metric"><strong>Avg Daily:</strong> ` + fmt.Sprintf("%.0f", previousWeek.TotalCalories/7) + ` cal</div>
-                    <div class="metric"><strong>Protein:</strong> ` + fmt.Sprintf("%.1f", previousWeek.TotalProtein) + `g</div>
-                    <div class="metric"><strong>Carbs:</strong> ` + fmt.Sprintf("%.1f", previousWeek.TotalCarbs) + `g</div>
-                    <div class="metric"><strong>Fat:</strong> ` + fmt.Sprintf("%.1f", previousWeek.TotalFat) + `g</div>
-                    <div class="metric"><strong>Fiber:</strong> ` + fmt.Sprintf("%.1f", previousWeek.TotalFiber) + `g</div>
+                    <div class="metric">Used for comparison in AI analysis</div>
                 </div>
             </div>
         </div>
-        
+
+        <div class="analysis">
+            <h3>AI Analysis & Recommendations</h3>
+            <div style="white-space: pre-wrap;">{{.Analysis}}</div>
+        </div>
+
+        <div class="footer">
+            <p>Generated by MailMunch Weekly Report System</p>
+        </div>
+    </div>
+</body>
+</html>`
+
+	tmpl, err := template.New("email").Parse(htmlTemplate)
+	if err != nil {
+		log.Printf("Error parsing email template: %v", err)
+		// Fallback to simple string concatenation
+		return buildSimpleHTMLEmail(analysis, currentWeek, previousWeek)
+	}
+
+	data := EmailData{
+		CurrentWeek:  currentWeek,
+		PreviousWeek: previousWeek,
+		Analysis:     analysis,
+	}
+
+	var buffer strings.Builder
+	if err := tmpl.Execute(&buffer, data); err != nil {
+		log.Printf("Error executing email template: %v", err)
+		// Fallback to simple string concatenation
+		return buildSimpleHTMLEmail(analysis, currentWeek, previousWeek)
+	}
+
+	return buffer.String()
+}
+
+// Fallback function for when templating fails
+func buildSimpleHTMLEmail(analysis string, currentWeek, previousWeek *WeeklyData) string {
+	var builder strings.Builder
+
+	builder.WriteString(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Weekly Nutrition Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
+        .analysis { background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Weekly Nutrition Report</h1>
+            <p>` + currentWeek.StartDate + ` to ` + currentWeek.EndDate + `</p>
+        </div>
+
         <div class="analysis">
             <h3>AI Analysis & Recommendations</h3>
             <div style="white-space: pre-wrap;">` + analysis + `</div>
         </div>
-        
+
         <div class="footer">
             <p>Generated by MailMunch Weekly Report System</p>
         </div>
@@ -600,61 +573,15 @@ func buildTextEmail(analysis string, currentWeek, previousWeek *WeeklyData) stri
 
 	builder.WriteString("WEEKLY NUTRITION REPORT\n")
 	builder.WriteString("=" + strings.Repeat("=", 50) + "\n\n")
-	
+
 	builder.WriteString("Report Period: " + currentWeek.StartDate + " to " + currentWeek.EndDate + "\n\n")
-	
-	builder.WriteString("CURRENT WEEK SUMMARY:\n")
-	builder.WriteString("-" + strings.Repeat("-", 30) + "\n")
-	builder.WriteString(fmt.Sprintf("Total Calories: %.0f\n", currentWeek.TotalCalories))
-	builder.WriteString(fmt.Sprintf("Average Daily: %.0f calories\n", currentWeek.TotalCalories/7))
-	builder.WriteString(fmt.Sprintf("Protein: %.1fg\n", currentWeek.TotalProtein))
-	builder.WriteString(fmt.Sprintf("Carbs: %.1fg\n", currentWeek.TotalCarbs))
-	builder.WriteString(fmt.Sprintf("Fat: %.1fg\n", currentWeek.TotalFat))
-	builder.WriteString(fmt.Sprintf("Fiber: %.1fg\n\n", currentWeek.TotalFiber))
-	
-	builder.WriteString("PREVIOUS WEEK COMPARISON:\n")
-	builder.WriteString("-" + strings.Repeat("-", 30) + "\n")
-	builder.WriteString(fmt.Sprintf("Total Calories: %.0f\n", previousWeek.TotalCalories))
-	builder.WriteString(fmt.Sprintf("Average Daily: %.0f calories\n", previousWeek.TotalCalories/7))
-	builder.WriteString(fmt.Sprintf("Protein: %.1fg\n", previousWeek.TotalProtein))
-	builder.WriteString(fmt.Sprintf("Carbs: %.1fg\n", previousWeek.TotalCarbs))
-	builder.WriteString(fmt.Sprintf("Fat: %.1fg\n", previousWeek.TotalFat))
-	builder.WriteString(fmt.Sprintf("Fiber: %.1fg\n\n", previousWeek.TotalFiber))
-	
+
 	builder.WriteString("AI ANALYSIS & RECOMMENDATIONS:\n")
 	builder.WriteString("-" + strings.Repeat("-", 40) + "\n")
 	builder.WriteString(analysis)
 	builder.WriteString("\n\n")
-	
+
 	builder.WriteString("Generated by MailMunch Weekly Report System\n")
-	
+
 	return builder.String()
-}
-
-func getDefaultPrompt() string {
-	return `Please analyze my weekly food data and provide a comprehensive report with the following:
-
-1. WEEKLY SUMMARY: Compare this week's nutrition to the previous week, highlighting key changes in calories, macronutrients, and overall diet quality.
-
-2. WEIGHT LOSS RECOMMENDATIONS: Based on my food intake, suggest specific changes to support healthy weight loss including:
-   - Calorie adjustments if needed
-   - Food swaps for lower-calorie alternatives
-   - Meal timing recommendations
-   - Portion control suggestions
-
-3. MUSCLE GROWTH RECOMMENDATIONS: Analyze my protein intake and suggest improvements for muscle building:
-   - Protein targets and timing
-   - Post-workout nutrition suggestions
-   - Amino acid profile recommendations
-   - Supplement considerations if applicable
-
-4. FOOD QUALITY ANALYSIS: Evaluate the nutritional quality of my food choices:
-   - Whole food vs processed food ratio
-   - Micronutrient diversity
-   - Fiber intake adequacy
-   - Sugar and sodium levels
-
-5. ACTIONABLE NEXT WEEK PLAN: Provide 3-5 specific, actionable steps I can take next week to improve my nutrition for both weight loss and muscle growth goals.
-
-Please be specific, evidence-based, and practical in your recommendations. Consider that I'm looking to optimize my nutrition for both fat loss and muscle gain simultaneously.`
 }

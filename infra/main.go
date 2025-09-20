@@ -126,11 +126,34 @@ func main() {
 		if err != nil {
 			return err
 		}
-		_, err = appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
+		configVersion, err := appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
 			ApplicationId:          app.ID(),
 			ConfigurationProfileId: profile.ConfigurationProfileId,
-			Content:                pulumi.String("{\"greeting\":\"Hello from AppConfig\"}"),
-			ContentType:            pulumi.String("application/json"),
+			Content: pulumi.String(`{
+				"weekly_report_base_prompt": "Please analyze my weekly food data and provide a comprehensive report with the following:\n\n1. WEEKLY SUMMARY: Compare this week's nutrition to the previous week, highlighting key changes in calories, macronutrients, and overall diet quality.\n\n2. WEIGHT LOSS RECOMMENDATIONS: Based on my food intake, suggest specific changes to support healthy weight loss including:\n   - Calorie adjustments if needed\n   - Food swaps for lower-calorie alternatives\n   - Meal timing recommendations\n   - Portion control suggestions\n\n3. MUSCLE GROWTH RECOMMENDATIONS: Analyze my protein intake and suggest improvements for muscle building:\n   - Protein targets and timing\n   - Post-workout nutrition suggestions\n   - Amino acid profile recommendations\n   - Supplement considerations if applicable\n\n4. FOOD QUALITY ANALYSIS: Evaluate the nutritional quality of my food choices:\n   - Whole food vs processed food ratio\n   - Micronutrient diversity\n   - Fiber intake adequacy\n   - Sugar and sodium levels\n\n5. ACTIONABLE NEXT WEEK PLAN: Provide 3-5 specific, actionable steps I can take next week to improve my nutrition for both weight loss and muscle growth goals.\n\nPlease be specific, evidence-based, and practical in your recommendations. Consider that I'm looking to optimize my nutrition for both fat loss and muscle gain simultaneously."
+			}`),
+			ContentType: pulumi.String("application/json"),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Create AppConfig environment
+		env, err := appconfig.NewEnvironment(ctx, fmt.Sprintf("%s-%s-env-prod", project, stack), &appconfig.EnvironmentArgs{
+			Name:          pulumi.String("prod"),
+			ApplicationId: app.ID(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Create AppConfig deployment to make the configuration available
+		_, err = appconfig.NewDeployment(ctx, fmt.Sprintf("%s-%s-deployment", project, stack), &appconfig.DeploymentArgs{
+			ApplicationId:              app.ID(),
+			ConfigurationProfileId:     profile.ConfigurationProfileId,
+			ConfigurationVersion:       pulumi.Sprintf("%d", configVersion.VersionNumber),
+			EnvironmentId:              env.EnvironmentId,
+			DeploymentStrategyId:       pulumi.String("AppConfig.AllAtOnce"),
 		}, awsOpts)
 		if err != nil {
 			return err
@@ -409,6 +432,73 @@ func main() {
 			return err
 		}
 
+		// Add Athena policy for weekly report Lambda
+		weeklyReportAthenaPolicy := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"athena:StartQueryExecution",
+						"athena:GetQueryExecution",
+						"athena:GetQueryResults",
+						"athena:StopQueryExecution",
+						"glue:GetDatabase",
+						"glue:GetTable",
+						"glue:GetPartitions",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"*", // Athena and Glue resources don't support fine-grained ARNs
+					}),
+				},
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"s3:GetBucketLocation",
+						"s3:GetObject",
+						"s3:ListBucket",
+						"s3:PutObject",
+						"s3:DeleteObject",
+					}),
+					Resources: pulumi.StringArray{
+						emailsBucket.Arn,
+						pulumi.Sprintf("%s/*", emailsBucket.Arn),
+					},
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-athena", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportAthenaPolicy.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Add AppConfig policy for weekly report Lambda
+		weeklyReportAppConfigPolicy := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"appconfig:GetConfiguration",
+						"appconfig:StartConfigurationSession",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"*", // AppConfig permissions require broad access
+					}),
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-appconfig", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportAppConfigPolicy.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
 		// Get email configuration
 		reportEmail := ""
 		if v, ok := ctx.GetConfig("mailmunch:reportEmail"); ok {
@@ -430,11 +520,17 @@ func main() {
 			Timeout:       pulumi.Int(300), // 5 minutes for OpenAI API calls
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
-					"DATA_BUCKET":       emailsBucket.Bucket,
-					"OPENAI_SECRET_ARN": openaiSecret.Arn,
-					"REPORT_EMAIL":      pulumi.String(reportEmail),
-					"SENDER_EMAIL":      pulumi.String(senderEmail),
-					"AWS_REGION":        aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
+					"DATA_BUCKET":                emailsBucket.Bucket,
+					"OPENAI_SECRET_ARN":          openaiSecret.Arn,
+					"REPORT_EMAIL":               pulumi.String(reportEmail),
+					"SENDER_EMAIL":               pulumi.String(senderEmail),
+					"AWS_REGION":                 aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
+					"ATHENA_DATABASE":            pulumi.String("mailmunch_data"),
+					"ATHENA_WORKGROUP":           pulumi.String("primary"),
+					"ATHENA_RESULTS_BUCKET":      emailsBucket.Bucket,
+					"APPCONFIG_APPLICATION":      app.ID(),
+					"APPCONFIG_ENVIRONMENT":      pulumi.String("prod"),
+					"APPCONFIG_CONFIGURATION":    profile.ConfigurationProfileId,
 				},
 			},
 		}, awsOpts)
