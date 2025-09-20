@@ -149,11 +149,11 @@ func main() {
 
 		// Create AppConfig deployment to make the configuration available
 		_, err = appconfig.NewDeployment(ctx, fmt.Sprintf("%s-%s-deployment", project, stack), &appconfig.DeploymentArgs{
-			ApplicationId:              app.ID(),
-			ConfigurationProfileId:     profile.ConfigurationProfileId,
-			ConfigurationVersion:       pulumi.Sprintf("%d", configVersion.VersionNumber),
-			EnvironmentId:              env.EnvironmentId,
-			DeploymentStrategyId:       pulumi.String("AppConfig.AllAtOnce"),
+			ApplicationId:          app.ID(),
+			ConfigurationProfileId: profile.ConfigurationProfileId,
+			ConfigurationVersion:   pulumi.Sprintf("%d", configVersion.VersionNumber),
+			EnvironmentId:          env.EnvironmentId,
+			DeploymentStrategyId:   pulumi.String("AppConfig.AllAtOnce"),
 		}, awsOpts)
 		if err != nil {
 			return err
@@ -520,16 +520,16 @@ func main() {
 			Timeout:       pulumi.Int(300), // 5 minutes for OpenAI API calls
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
-					"OPENAI_SECRET_ARN":          openaiSecret.Arn,
-					"REPORT_EMAIL":               pulumi.String(reportEmail),
-					"SENDER_EMAIL":               pulumi.String(senderEmail),
-					"AWS_REGION":                 aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
-					"ATHENA_DATABASE":            pulumi.String("mailmunch_data"),
-					"ATHENA_WORKGROUP":           pulumi.String("primary"),
-					"ATHENA_RESULTS_BUCKET":      emailsBucket.Bucket,
-					"APPCONFIG_APPLICATION":      app.ID(),
-					"APPCONFIG_ENVIRONMENT":      pulumi.String("prod"),
-					"APPCONFIG_CONFIGURATION":    profile.ConfigurationProfileId,
+					"OPENAI_SECRET_ARN":       openaiSecret.Arn,
+					"REPORT_EMAIL":            pulumi.String(reportEmail),
+					"SENDER_EMAIL":            pulumi.String(senderEmail),
+					"AWS_REGION":              aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
+					"ATHENA_DATABASE":         pulumi.String("mailmunch_data"),
+					"ATHENA_WORKGROUP":        pulumi.String("primary"),
+					"ATHENA_RESULTS_BUCKET":   emailsBucket.Bucket,
+					"APPCONFIG_APPLICATION":   app.ID(),
+					"APPCONFIG_ENVIRONMENT":   pulumi.String("prod"),
+					"APPCONFIG_CONFIGURATION": profile.ConfigurationProfileId,
 				},
 			},
 		}, awsOpts)
