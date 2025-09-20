@@ -33,6 +33,10 @@ jobs:
         run: |
           ./scripts/build-lambda.sh loseit_transform dist/loseit_transform.zip
 
+      - name: Build Lambda weekly_report
+        run: |
+          ./scripts/build-lambda.sh weekly_report dist/weekly_report.zip
+
       - name: Upload lambda artifacts
         uses: actions/upload-artifact@v4
         with:

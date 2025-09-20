@@ -3,3 +3,6 @@ config:
   mailmunch:sesEmailIdentity: mailmunch.co.uk
   mailmunch:recipientAddress: reports@mailmunch.co.uk
   mailmunch:allowedSenderDomain: loseit.com
+  mailmunch:openaiApiKey: ""  # Set this to your OpenAI API key
+  mailmunch:reportEmail: reports@mailmunch.co.uk
+  mailmunch:senderEmail: reports@mailmunch.co.uk
