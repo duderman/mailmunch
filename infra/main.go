@@ -345,31 +345,6 @@ func main() {
 			return err
 		}
 
-		// S3 policy for weekly report Lambda to read curated data
-		weeklyReportS3PolicyDoc := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
-			Statements: iam.GetPolicyDocumentStatementArray{
-				iam.GetPolicyDocumentStatementArgs{
-					Effect: pulumi.String("Allow"),
-					Actions: pulumi.ToStringArray([]string{
-						"s3:GetObject",
-						"s3:ListBucket",
-					}),
-					Resources: pulumi.StringArray{
-						emailsBucket.Arn,
-						pulumi.Sprintf("%s/*", emailsBucket.Arn),
-					},
-				},
-			},
-		})
-
-		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-s3", project, stack), &iam.RolePolicyArgs{
-			Role:   weeklyReportRole.ID(),
-			Policy: weeklyReportS3PolicyDoc.Json(),
-		}, awsOpts)
-		if err != nil {
-			return err
-		}
-
 		// SES policy for weekly report Lambda to send emails
 		weeklyReportSESPolicyDoc := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
 			Statements: iam.GetPolicyDocumentStatementArray{
