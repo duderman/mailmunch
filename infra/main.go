@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	aws "github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/appconfig"
@@ -10,6 +11,7 @@ import (
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/lambda"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/s3"
+	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/scheduler"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/secretsmanager"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/ses"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/sesv2"
@@ -125,11 +127,43 @@ func main() {
 		if err != nil {
 			return err
 		}
-		_, err = appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
+		// Read the prompt from the text file
+		promptContent, err := os.ReadFile("weekly_report_prompt.txt")
+		if err != nil {
+			return fmt.Errorf("failed to read weekly_report_prompt.txt: %w", err)
+		}
+
+		// Create JSON configuration with the prompt
+		configJSON := fmt.Sprintf(`{
+			"weekly_report_base_prompt": %q
+		}`, string(promptContent))
+
+		configVersion, err := appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
 			ApplicationId:          app.ID(),
 			ConfigurationProfileId: profile.ConfigurationProfileId,
-			Content:                pulumi.String("{\"greeting\":\"Hello from AppConfig\"}"),
+			Content:                pulumi.String(configJSON),
 			ContentType:            pulumi.String("application/json"),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Create AppConfig environment
+		env, err := appconfig.NewEnvironment(ctx, fmt.Sprintf("%s-%s-env-prod", project, stack), &appconfig.EnvironmentArgs{
+			Name:          pulumi.String("prod"),
+			ApplicationId: app.ID(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Create AppConfig deployment to make the configuration available
+		_, err = appconfig.NewDeployment(ctx, fmt.Sprintf("%s-%s-deployment", project, stack), &appconfig.DeploymentArgs{
+			ApplicationId:          app.ID(),
+			ConfigurationProfileId: profile.ConfigurationProfileId,
+			ConfigurationVersion:   pulumi.Sprintf("%d", configVersion.VersionNumber),
+			EnvironmentId:          env.EnvironmentId,
+			DeploymentStrategyId:   pulumi.String("AppConfig.AllAtOnce"),
 		}, awsOpts)
 		if err != nil {
 			return err
@@ -284,11 +318,275 @@ func main() {
 			return err
 		}
 
+		// Weekly Report Lambda Function
+		weeklyReportRole, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-weekly-report-role", project, stack), &iam.RoleArgs{
+			AssumeRolePolicy: pulumi.String(`{
+				"Version": "2012-10-17",
+				"Statement": [
+					{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "lambda.amazonaws.com"
+						},
+						"Action": "sts:AssumeRole"
+					}
+				]
+			}`),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		_, err = iam.NewRolePolicyAttachment(ctx, fmt.Sprintf("%s-%s-weekly-report-basic", project, stack), &iam.RolePolicyAttachmentArgs{
+			Role:      weeklyReportRole.Name,
+			PolicyArn: pulumi.String("arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// SES policy for weekly report Lambda to send emails
+		weeklyReportSESPolicyDoc := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"ses:SendEmail",
+						"ses:SendRawEmail",
+					}),
+					Resources: pulumi.StringArray{
+						pulumi.String("*"),
+					},
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-ses", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportSESPolicyDoc.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Create OpenAI API key secret
+		openaiSecret, err := secretsmanager.NewSecret(ctx, fmt.Sprintf("%s-%s-openai-secret", project, stack), &secretsmanager.SecretArgs{
+			Description: pulumi.String("OpenAI API key for weekly nutrition reports"),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Get OpenAI API key from config and store in Secrets Manager
+		openaiApiKey := ""
+		if v, ok := ctx.GetConfig("mailmunch:openaiApiKey"); ok {
+			openaiApiKey = v
+		}
+
+		// Only create secret version if API key is provided
+		if openaiApiKey != "" {
+			_, err = secretsmanager.NewSecretVersion(ctx, fmt.Sprintf("%s-%s-openai-secret-version", project, stack), &secretsmanager.SecretVersionArgs{
+				SecretId:     openaiSecret.ID(),
+				SecretString: pulumi.String(openaiApiKey),
+			}, awsOpts)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Add Secrets Manager policy for weekly report Lambda
+		weeklyReportSecretsPolicy := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"secretsmanager:GetSecretValue",
+					}),
+					Resources: pulumi.StringArray{
+						openaiSecret.Arn,
+					},
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-secrets", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportSecretsPolicy.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Add Athena policy for weekly report Lambda
+		weeklyReportAthenaPolicy := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"athena:StartQueryExecution",
+						"athena:GetQueryExecution",
+						"athena:GetQueryResults",
+						"athena:StopQueryExecution",
+						"glue:GetDatabase",
+						"glue:GetTable",
+						"glue:GetPartitions",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"*", // Athena and Glue resources don't support fine-grained ARNs
+					}),
+				},
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"s3:GetBucketLocation",
+						"s3:GetObject",
+						"s3:ListBucket",
+						"s3:PutObject",
+						"s3:DeleteObject",
+					}),
+					Resources: pulumi.StringArray{
+						emailsBucket.Arn,
+						pulumi.Sprintf("%s/*", emailsBucket.Arn),
+					},
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-athena", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportAthenaPolicy.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Add AppConfig policy for weekly report Lambda
+		weeklyReportAppConfigPolicy := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"appconfig:GetConfiguration",
+						"appconfig:StartConfigurationSession",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"*", // AppConfig permissions require broad access
+					}),
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-weekly-report-appconfig", project, stack), &iam.RolePolicyArgs{
+			Role:   weeklyReportRole.ID(),
+			Policy: weeklyReportAppConfigPolicy.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Get email configuration
+		reportEmail := ""
+		if v, ok := ctx.GetConfig("mailmunch:reportEmail"); ok {
+			reportEmail = v
+		}
+
+		senderEmail := ""
+		if v, ok := ctx.GetConfig("mailmunch:senderEmail"); ok {
+			senderEmail = v
+		}
+
+		weeklyReportZip := pulumi.NewFileArchive("../dist/weekly_report.zip")
+		weeklyReportFn, err := lambda.NewFunction(ctx, fmt.Sprintf("%s-%s-weekly-report", project, stack), &lambda.FunctionArgs{
+			Role:          weeklyReportRole.Arn,
+			Runtime:       pulumi.String("provided.al2"),
+			Handler:       pulumi.String("bootstrap"),
+			Architectures: pulumi.ToStringArray([]string{"arm64"}),
+			Code:          weeklyReportZip,
+			Timeout:       pulumi.Int(300), // 5 minutes for OpenAI API calls
+			Environment: &lambda.FunctionEnvironmentArgs{
+				Variables: pulumi.StringMap{
+					"OPENAI_SECRET_ARN":       openaiSecret.Arn,
+					"REPORT_EMAIL":            pulumi.String(reportEmail),
+					"SENDER_EMAIL":            pulumi.String(senderEmail),
+					"AWS_REGION":              aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
+					"ATHENA_DATABASE":         pulumi.String("mailmunch_data"),
+					"ATHENA_WORKGROUP":        pulumi.String("primary"),
+					"ATHENA_RESULTS_BUCKET":   emailsBucket.Bucket,
+					"APPCONFIG_APPLICATION":   app.ID(),
+					"APPCONFIG_ENVIRONMENT":   pulumi.String("prod"),
+					"APPCONFIG_CONFIGURATION": profile.ConfigurationProfileId,
+				},
+			},
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// EventBridge Scheduler role
+		schedulerRole, err := iam.NewRole(ctx, fmt.Sprintf("%s-%s-scheduler-role", project, stack), &iam.RoleArgs{
+			AssumeRolePolicy: pulumi.String(`{
+				"Version": "2012-10-17",
+				"Statement": [
+					{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "scheduler.amazonaws.com"
+						},
+						"Action": "sts:AssumeRole"
+					}
+				]
+			}`),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// Lambda invoke policy for scheduler
+		schedulerLambdaPolicyDoc := iam.GetPolicyDocumentOutput(ctx, iam.GetPolicyDocumentOutputArgs{
+			Statements: iam.GetPolicyDocumentStatementArray{
+				iam.GetPolicyDocumentStatementArgs{
+					Effect: pulumi.String("Allow"),
+					Actions: pulumi.ToStringArray([]string{
+						"lambda:InvokeFunction",
+					}),
+					Resources: pulumi.StringArray{
+						weeklyReportFn.Arn,
+					},
+				},
+			},
+		})
+
+		_, err = iam.NewRolePolicy(ctx, fmt.Sprintf("%s-%s-scheduler-lambda", project, stack), &iam.RolePolicyArgs{
+			Role:   schedulerRole.ID(),
+			Policy: schedulerLambdaPolicyDoc.Json(),
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		// EventBridge Scheduler - every Sunday at 6 PM London time
+		_, err = scheduler.NewSchedule(ctx, fmt.Sprintf("%s-%s-weekly-report-schedule", project, stack), &scheduler.ScheduleArgs{
+			Description:        pulumi.String("Trigger weekly nutrition report every Sunday at 6 PM London time"),
+			ScheduleExpression: pulumi.String("cron(0 18 ? * SUN *)"), // 6 PM UTC on Sundays (7 PM London time during DST, 6 PM during standard time)
+			FlexibleTimeWindow: &scheduler.ScheduleFlexibleTimeWindowArgs{
+				Mode: pulumi.String("OFF"),
+			},
+			Target: &scheduler.ScheduleTargetArgs{
+				Arn:     weeklyReportFn.Arn,
+				RoleArn: schedulerRole.Arn,
+				Input:   pulumi.String(`{"source":"aws.scheduler","detail-type":"Weekly Report Trigger"}`),
+			},
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
 		ctx.Export("bucketName", bucket.Bucket)
 		ctx.Export("dataBucket", emailsBucket.Bucket)
 		ctx.Export("ecrRepositoryUrl", repo.RepositoryUrl)
 		ctx.Export("secretArn", secret.Arn)
 		ctx.Export("emailIngestLambda", emailIngestFn.Name)
+		ctx.Export("weeklyReportLambda", weeklyReportFn.Name)
 		ctx.Export("region", aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name())
 		ctx.Export("allowedSenderDomain", pulumi.String(allowedSenderDomain))
 

@@ -24,7 +24,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: build.yml
           pr: ${{ github.event.number }}
-          name: lambda-zip
+          name: lambda-zips
           path: dist/
           if_no_artifact_found: fail
 

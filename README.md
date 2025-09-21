@@ -51,6 +51,21 @@ SES (recipient filter) → S3 incoming/ (90-day retention) → Lambda (LoseIt ch
 5. **CSV triggers transform** Lambda to create Parquet files
 6. **Glue crawler** makes data queryable in Athena
 
+### Weekly Report System
+
+The system includes an AI-powered weekly nutrition analysis with secure credential management:
+
+1. **EventBridge Scheduler** triggers weekly report Lambda every Sunday at 6 PM London time
+2. **Weekly Report Lambda** queries the past week's food data from S3
+3. **OpenAI API integration** analyzes nutrition data and provides personalized recommendations (API key securely stored in AWS Secrets Manager)
+4. **SES email delivery** sends comprehensive HTML and text reports
+5. **AI analysis includes**:
+   - Week-over-week nutrition comparison
+   - Weight loss recommendations with specific food swaps
+   - Muscle growth nutrition guidance and protein timing
+   - Food quality analysis (whole vs processed foods)
+   - Actionable 5-step plan for the upcoming week
+
 ### S3 Structure
 
 ```text
@@ -85,6 +100,7 @@ make test-coverage
 ```bash
 make lambda-email    # builds email_ingest lambda
 make lambda-transform # builds loseit_transform lambda
+make lambda-weekly    # builds weekly_report lambda
 ```
 
 ### Deployment
@@ -105,6 +121,9 @@ pulumi config set mailmunch:dataBucketName mailmunch-data            # optional:
 pulumi config set mailmunch:allowedSenderDomain loseit.com           # optional: allowed email domain
 pulumi config set mailmunch:sesEmailIdentity mailmunch.co.uk         # optional: SES email identity
 pulumi config set mailmunch:recipientAddress reports@mailmunch.co.uk # required: recipient address
+pulumi config set mailmunch:openaiApiKey "sk-..."                    # required: OpenAI API key for weekly reports (stored in Secrets Manager)
+pulumi config set mailmunch:reportEmail reports@mailmunch.co.uk      # required: email for weekly reports
+pulumi config set mailmunch:senderEmail reports@mailmunch.co.uk      # required: sender email for reports
 ```
 
 1. Preview infra
@@ -125,6 +144,9 @@ make infra-up
 - `mailmunch:allowedSenderDomain` - Domain to filter emails from (default: "loseit.com")
 - `mailmunch:sesEmailIdentity` - SES email identity for domain verification (optional)
 - `mailmunch:recipientAddress` - Email address that SES will process (required for email receiving)
+- `mailmunch:openaiApiKey` - OpenAI API key for AI-powered weekly analysis (securely stored in AWS Secrets Manager)
+- `mailmunch:reportEmail` - Email address to receive weekly nutrition reports (required for weekly reports)
+- `mailmunch:senderEmail` - Email address to send reports from (required for weekly reports, must be verified in SES)
 
 ## CI/CD secrets
 
