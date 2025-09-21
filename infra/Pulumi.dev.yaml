@@ -3,6 +3,5 @@ config:
   mailmunch:sesEmailIdentity: mailmunch.co.uk
   mailmunch:recipientAddress: reports@mailmunch.co.uk
   mailmunch:allowedSenderDomain: loseit.com
-  mailmunch:openaiApiKey: ""  # Set this to your OpenAI API key (securely stored in AWS Secrets Manager)
-  mailmunch:reportEmail: reports@mailmunch.co.uk
+  mailmunch:reportEmail: zduderman@gmail.com
   mailmunch:senderEmail: reports@mailmunch.co.uk
