@@ -81,14 +81,14 @@ func handler(ctx context.Context, evt events.S3Event) error {
 	for _, rec := range evt.Records {
 		b := rec.S3.Bucket.Name
 		key := rec.S3.Object.Key
-		
+
 		// URL decode the key since S3 events may provide URL-encoded keys
 		decodedKey, err := url.QueryUnescape(key)
 		if err != nil {
 			log.Printf("warn: failed to decode key %s, using original: %v", key, err)
 			decodedKey = key
 		}
-		
+
 		if !strings.HasPrefix(decodedKey, rawCsvBase) {
 			log.Printf("skip non-matching key: %s", decodedKey)
 			continue
@@ -265,7 +265,7 @@ func extractYMD(key string) (string, string, string) {
 		// If decoding fails, use the original key
 		decodedKey = key
 	}
-	
+
 	// Expect .../year=YYYY/month=MM/day=DD/...
 	segs := strings.Split(decodedKey, "/")
 	var y, m, d string
