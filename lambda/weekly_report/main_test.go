@@ -3,8 +3,6 @@ package main
 import (
 	"testing"
 	"time"
-
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
 func TestGetWeekRange(t *testing.T) {
@@ -178,20 +176,4 @@ func TestConfigurationStructure(t *testing.T) {
 	if config.AppConfigConfiguration == "" {
 		t.Error("AppConfigConfiguration should not be empty")
 	}
-}
-
-func TestGetOpenAIAPIKeyValidation(t *testing.T) {
-	// Test the function signature exists and validates input
-	// We can't easily test AWS SDK calls without proper mocking
-	// So we just verify the function exists with the correct signature
-
-	// This test ensures the function compiles and has the expected signature
-	var fn func(*secretsmanager.SecretsManager, string) (string, error) = getOpenAIAPIKey
-
-	if fn == nil {
-		t.Error("getOpenAIAPIKey function should exist")
-	}
-
-	// Test that empty secret ARN would be handled (though we can't test with nil client)
-	// In a real implementation, we'd use dependency injection or mocking here
 }
