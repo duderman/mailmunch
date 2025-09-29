@@ -508,7 +508,6 @@ func main() {
 					"OPENAI_SECRET_ARN":       openaiSecret.Arn,
 					"REPORT_EMAIL":            pulumi.String(reportEmail),
 					"SENDER_EMAIL":            pulumi.String(senderEmail),
-					"AWS_REGION":              aws.GetRegionOutput(ctx, aws.GetRegionOutputArgs{}).Name(),
 					"ATHENA_DATABASE":         pulumi.String("mailmunch_data"),
 					"ATHENA_WORKGROUP":        pulumi.String("primary"),
 					"ATHENA_RESULTS_BUCKET":   emailsBucket.Bucket,
