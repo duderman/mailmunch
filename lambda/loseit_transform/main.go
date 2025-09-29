@@ -83,7 +83,8 @@ func handler(ctx context.Context, evt events.S3Event) error {
 		key := rec.S3.Object.Key
 
 		// URL decode the key since S3 events may provide URL-encoded keys
-		decodedKey, err := url.QueryUnescape(key)
+		decodedKey, err := urlDecode(key)
+
 		if err != nil {
 			log.Printf("warn: failed to decode key %s, using original: %v", key, err)
 			decodedKey = key
@@ -100,7 +101,7 @@ func handler(ctx context.Context, evt events.S3Event) error {
 		}
 
 		// Read CSV - use original (possibly encoded) key for S3 API call
-		obj, err := s3c.GetObject(ctx, &s3.GetObjectInput{Bucket: &b, Key: &key})
+		obj, err := s3c.GetObject(ctx, &s3.GetObjectInput{Bucket: &b, Key: &decodedKey})
 		if err != nil {
 			return fmt.Errorf("s3 get %s/%s: %w", b, key, err)
 		}
@@ -281,6 +282,45 @@ func extractYMD(key string) (string, string, string) {
 		}
 	}
 	return y, m, d
+}
+
+func urlDecode(s string) (string, error) {
+	// S3 event keys may be URL-encoded; handle + and %XX escapes.
+	r := strings.ReplaceAll(s, "+", "%20")
+	u, err := urlUnescape(r)
+	if err != nil {
+		return s, err
+	}
+	return u, nil
+}
+
+func urlUnescape(s string) (string, error) {
+	// simplified unescape for %xx sequences
+	var out []byte
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && i+2 < len(s) {
+			var hv byte
+			for j := 1; j <= 2; j++ {
+				hv <<= 4
+				c := s[i+j]
+				switch {
+				case '0' <= c && c <= '9':
+					hv |= c - '0'
+				case 'a' <= c && c <= 'f':
+					hv |= c - 'a' + 10
+				case 'A' <= c && c <= 'F':
+					hv |= c - 'A' + 10
+				default:
+					return "", fmt.Errorf("invalid escape")
+				}
+			}
+			out = append(out, hv)
+			i += 2
+		} else {
+			out = append(out, s[i])
+		}
+	}
+	return string(out), nil
 }
 
 func parseFloat(s string) (float64, error) {
