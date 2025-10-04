@@ -467,6 +467,7 @@ func main() {
 					Effect: pulumi.String("Allow"),
 					Actions: pulumi.ToStringArray([]string{
 						"appconfig:GetConfiguration",
+						"appconfig:GetLatestConfiguration",
 						"appconfig:StartConfigurationSession",
 					}),
 					Resources: pulumi.ToStringArray([]string{
