@@ -759,6 +759,9 @@ func main() {
 			},
 			// Run every Sunday one hour before the weekly report (17:00 UTC / 6 pm London during DST).
 			Schedule: pulumi.String("cron(0 17 ? * SUN *)"),
+			SchemaChangePolicy: &glue.CrawlerSchemaChangePolicyArgs{
+				DeleteBehavior: pulumi.String("LOG"),
+			},
 		}, awsOpts)
 		if err != nil {
 			return err
