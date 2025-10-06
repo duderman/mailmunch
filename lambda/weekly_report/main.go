@@ -423,7 +423,6 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 				},
 			},
 			MaxCompletionTokens: 2000,
-			Temperature:         0.7,
 		},
 	)
 
