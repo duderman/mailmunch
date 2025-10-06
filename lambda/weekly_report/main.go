@@ -63,7 +63,7 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 		SenderEmail:            getEnvOrDefault("SENDER_EMAIL", ""),
 		Region:                 getEnvOrDefault("AWS_REGION", "eu-west-2"),
 		AthenaDatabase:         getEnvOrDefault("ATHENA_DATABASE", "mailmunch_dev_db"),
-		AthenaTable:            getEnvOrDefault("ATHENA_TABLE", "loseit_loseit_parquet"),
+		AthenaTable:            getEnvOrDefault("ATHENA_TABLE", "loseit_entries"),
 		AthenaWorkgroup:        getEnvOrDefault("ATHENA_WORKGROUP", "primary"),
 		AthenaResultsBucket:    getEnvOrDefault("ATHENA_RESULTS_BUCKET", ""),
 		AppConfigApplication:   getEnvOrDefault("APPCONFIG_APPLICATION", ""),
@@ -281,7 +281,8 @@ func queryWeeklyDataWithAthena(ctx context.Context, athenaClient *athena.Athena,
 			"name=sugar_g" AS sugar,
 			"name=sodium_mg" AS sodium
 		FROM %s.%s
-		WHERE "name=record_type" <> 'exercise' AND "name=date" >= '%s' AND "name=date" <= '%s'
+		WHERE "name=record_type" <> 'Exercise'
+			AND date_parse("name=date", '%%m/%%d/%%%%Y') BETWEEN date '%s' AND date '%s'
 		ORDER BY date, food_name
 	`, config.AthenaDatabase, config.AthenaTable, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 
