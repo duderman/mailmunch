@@ -63,7 +63,7 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 		SenderEmail:            getEnvOrDefault("SENDER_EMAIL", ""),
 		Region:                 getEnvOrDefault("AWS_REGION", "eu-west-2"),
 		AthenaDatabase:         getEnvOrDefault("ATHENA_DATABASE", "mailmunch_dev_db"),
-		AthenaTable:            getEnvOrDefault("ATHENA_TABLE", "loseit_entries"),
+		AthenaTable:            getEnvOrDefault("ATHENA_TABLE", "loseit_loseit_parquet"),
 		AthenaWorkgroup:        getEnvOrDefault("ATHENA_WORKGROUP", "primary"),
 		AthenaResultsBucket:    getEnvOrDefault("ATHENA_RESULTS_BUCKET", ""),
 		AppConfigApplication:   getEnvOrDefault("APPCONFIG_APPLICATION", ""),
@@ -269,19 +269,19 @@ func getWeekRange(date time.Time) (start, end time.Time) {
 func queryWeeklyDataWithAthena(ctx context.Context, athenaClient *athena.Athena, config *Config, startDate, endDate time.Time) (*WeeklyData, error) {
 	query := fmt.Sprintf(`
 		SELECT
-			date,
-			name AS food_name,
-			quantity,
-			units AS unit,
-			calories,
-			protein_g AS protein,
-			carbs_g AS carbs,
-			fat_g AS fat,
-			fiber_g AS fiber,
-			sugar_g AS sugar,
-			sodium_mg AS sodium
+			"name=date" AS date,
+			"name=name" AS food_name,
+			"name=quantity" AS quantity,
+			"name=units" AS unit,
+			"name=calories" AS calories,
+			"name=protein_g" AS protein,
+			"name=carbs_g" AS carbs,
+			"name=fat_g" AS fat,
+			"name=fiber_g" AS fiber,
+			"name=sugar_g" AS sugar,
+			"name=sodium_mg" AS sodium
 		FROM %s.%s
-		WHERE record_type <> 'exercise' AND date >= '%s' AND date <= '%s'
+		WHERE "name=record_type" <> 'exercise' AND "name=date" >= '%s' AND "name=date" <= '%s'
 		ORDER BY date, food_name
 	`, config.AthenaDatabase, config.AthenaTable, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 

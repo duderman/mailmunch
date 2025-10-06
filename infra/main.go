@@ -71,7 +71,7 @@ func main() {
 			athenaDatabaseName = v
 		}
 
-		athenaTableName := "loseit_entries"
+		athenaTableName := "loseit_loseit_parquet"
 		if v, ok := ctx.GetConfig("mailmunch:athenaTableName"); ok && v != "" {
 			athenaTableName = v
 		}
@@ -614,63 +614,6 @@ func main() {
 			return err
 		}
 
-		loseitTableLocation := emailsBucket.Bucket.ApplyT(func(b string) string {
-			return fmt.Sprintf("s3://%s/curated/loseit_parquet/", b)
-		}).(pulumi.StringOutput)
-
-		loseitTable, err := glue.NewCatalogTable(ctx, fmt.Sprintf("%s-%s-loseit-table", project, stack), &glue.CatalogTableArgs{
-			DatabaseName: glueDb.Name,
-			Name:         pulumi.String(athenaTableName),
-			TableType:    pulumi.String("EXTERNAL_TABLE"),
-			Parameters: pulumi.StringMap{
-				"EXTERNAL":            pulumi.String("TRUE"),
-				"classification":      pulumi.String("parquet"),
-				"parquet.compression": pulumi.String("SNAPPY"),
-			},
-			StorageDescriptor: &glue.CatalogTableStorageDescriptorArgs{
-				Location:     loseitTableLocation.ToStringPtrOutput(),
-				InputFormat:  pulumi.String("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"),
-				OutputFormat: pulumi.String("org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"),
-				SerDeInfo: &glue.CatalogTableStorageDescriptorSerDeInfoArgs{
-					SerializationLibrary: pulumi.String("org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"),
-					Parameters: pulumi.StringMap{
-						"serialization.format": pulumi.String("1"),
-					},
-				},
-				Columns: glue.CatalogTableStorageDescriptorColumnArray{
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("record_type"), Type: pulumi.String("string")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("date"), Type: pulumi.String("string")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("meal"), Type: pulumi.String("string")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("name"), Type: pulumi.String("string")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("icon"), Type: pulumi.String("string")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("quantity"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("units"), Type: pulumi.String("string")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("calories"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("deleted"), Type: pulumi.String("boolean")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("fat_g"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("protein_g"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("carbs_g"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("saturated_fat_g"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("sugar_g"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("fiber_g"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("cholesterol_mg"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("sodium_mg"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("duration_minutes"), Type: pulumi.String("double")},
-					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("distance_km"), Type: pulumi.String("double")},
-				},
-			},
-			PartitionKeys: glue.CatalogTablePartitionKeyArray{
-				&glue.CatalogTablePartitionKeyArgs{Name: pulumi.String("year"), Type: pulumi.String("string")},
-				&glue.CatalogTablePartitionKeyArgs{Name: pulumi.String("month"), Type: pulumi.String("string")},
-				&glue.CatalogTablePartitionKeyArgs{Name: pulumi.String("day"), Type: pulumi.String("string")},
-			},
-		}, awsOpts)
-		if err != nil {
-			return err
-		}
-
-		ctx.Export("loseitTable", loseitTable.Name)
-
 		// Glue assume role policy
 		glueAssumeRolePolicy, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
 			Statements: []iam.GetPolicyDocumentStatement{
@@ -749,14 +692,12 @@ func main() {
 		_, err = glue.NewCrawler(ctx, fmt.Sprintf("%s-%s-loseit-crawler", project, stack), &glue.CrawlerArgs{
 			DatabaseName: glueDb.Name,
 			Role:         glueRole.Arn,
-			CatalogTargets: glue.CrawlerCatalogTargetArray{
-				&glue.CrawlerCatalogTargetArgs{
-					DatabaseName: glueDb.Name,
-					Tables: pulumi.StringArray{
-						pulumi.String(athenaTableName),
-					},
+			S3Targets: glue.CrawlerS3TargetArray{
+				&glue.CrawlerS3TargetArgs{
+					Path: emailsBucket.Bucket.ApplyT(func(b string) string { return fmt.Sprintf("s3://%s/curated/loseit_parquet/", b) }).(pulumi.StringOutput),
 				},
 			},
+			TablePrefix: pulumi.String("loseit_"),
 			// Run every Sunday one hour before the weekly report (17:00 UTC / 6 pm London during DST).
 			Schedule: pulumi.String("cron(0 17 ? * SUN *)"),
 			SchemaChangePolicy: &glue.CrawlerSchemaChangePolicyArgs{
