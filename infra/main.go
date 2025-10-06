@@ -749,12 +749,16 @@ func main() {
 		_, err = glue.NewCrawler(ctx, fmt.Sprintf("%s-%s-loseit-crawler", project, stack), &glue.CrawlerArgs{
 			DatabaseName: glueDb.Name,
 			Role:         glueRole.Arn,
-			S3Targets: glue.CrawlerS3TargetArray{
-				&glue.CrawlerS3TargetArgs{Path: emailsBucket.Bucket.ApplyT(func(b string) string { return fmt.Sprintf("s3://%s/curated/loseit_parquet/", b) }).(pulumi.StringOutput)},
+			CatalogTargets: glue.CrawlerCatalogTargetArray{
+				&glue.CrawlerCatalogTargetArgs{
+					DatabaseName: glueDb.Name,
+					Tables: pulumi.StringArray{
+						pulumi.String(athenaTableName),
+					},
+				},
 			},
 			// Run every Sunday one hour before the weekly report (17:00 UTC / 6 pm London during DST).
-			Schedule:    pulumi.String("cron(0 17 ? * SUN *)"),
-			TablePrefix: pulumi.String("loseit_"),
+			Schedule: pulumi.String("cron(0 17 ? * SUN *)"),
 		}, awsOpts)
 		if err != nil {
 			return err
