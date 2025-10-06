@@ -49,13 +49,17 @@ type LoseItLog struct {
 	Date            *string  `parquet:"name=date, type=UTF8, repetitiontype=OPTIONAL"`
 	Meal            *string  `parquet:"name=meal, type=UTF8, repetitiontype=OPTIONAL"`
 	Name            *string  `parquet:"name=name, type=UTF8, repetitiontype=OPTIONAL"`
+	Icon            *string  `parquet:"name=icon, type=UTF8, repetitiontype=OPTIONAL"`
 	Quantity        *float64 `parquet:"name=quantity, type=DOUBLE, repetitiontype=OPTIONAL"`
 	Units           *string  `parquet:"name=units, type=UTF8, repetitiontype=OPTIONAL"`
 	Calories        *float64 `parquet:"name=calories, type=DOUBLE, repetitiontype=OPTIONAL"`
+	Deleted         *bool    `parquet:"name=deleted, type=BOOLEAN, repetitiontype=OPTIONAL"`
 	ProteinG        *float64 `parquet:"name=protein_g, type=DOUBLE, repetitiontype=OPTIONAL"`
 	FatG            *float64 `parquet:"name=fat_g, type=DOUBLE, repetitiontype=OPTIONAL"`
 	CarbsG          *float64 `parquet:"name=carbs_g, type=DOUBLE, repetitiontype=OPTIONAL"`
+	SaturatedFatG   *float64 `parquet:"name=saturated_fat_g, type=DOUBLE, repetitiontype=OPTIONAL"`
 	FiberG          *float64 `parquet:"name=fiber_g, type=DOUBLE, repetitiontype=OPTIONAL"`
+	CholesterolMg   *float64 `parquet:"name=cholesterol_mg, type=DOUBLE, repetitiontype=OPTIONAL"`
 	SodiumMg        *float64 `parquet:"name=sodium_mg, type=DOUBLE, repetitiontype=OPTIONAL"`
 	SugarG          *float64 `parquet:"name=sugar_g, type=DOUBLE, repetitiontype=OPTIONAL"`
 	DurationMinutes *float64 `parquet:"name=duration_minutes, type=DOUBLE, repetitiontype=OPTIONAL"`
@@ -208,6 +212,26 @@ func mapRow(row map[string]string) *LoseItLog {
 		}
 		return &s
 	}
+	pbool := func(s string) *bool {
+		if s == "" {
+			return nil
+		}
+		norm := strings.TrimSpace(strings.ToLower(s))
+		switch norm {
+		case "true", "t", "yes", "y", "1":
+			v := true
+			return &v
+		case "false", "f", "no", "n", "0":
+			v := false
+			return &v
+		}
+		f, err := parseFloat(s)
+		if err != nil {
+			return nil
+		}
+		v := f != 0
+		return &v
+	}
 
 	// Determine record type
 	rt := get("record_type", "type")
@@ -228,13 +252,17 @@ func mapRow(row map[string]string) *LoseItLog {
 		meal = pstr(mealRaw)
 	}
 	name := get("name", "food", "exercise")
+	icon := pstr(get("icon"))
 	qty := pfloat(get("quantity", "amount"))
 	units := pstr(get("units", "unit"))
 	calories := pfloat(get("calories", "kcal"))
+	deleted := pbool(get("deleted"))
 	protein := pfloat(get("protein_(g)", "protein"))
 	fat := pfloat(get("fat_(g)", "fat"))
 	carbs := pfloat(get("carbohydrates_(g)", "carbs", "carbohydrates"))
+	satFat := pfloat(get("saturated_fat_(g)", "saturated_fat", "saturatedfat_(g)"))
 	fiber := pfloat(get("fiber_(g)", "fiber"))
+	chol := pfloat(get("cholesterol_(mg)", "cholesterol"))
 	sodium := pfloat(get("sodium_(mg)", "sodium"))
 	sugar := pfloat(get("sugars_(g)", "sugar"))
 	duration := pfloat(get("duration_minutes", "duration"))
@@ -245,13 +273,17 @@ func mapRow(row map[string]string) *LoseItLog {
 		Date:            pstr(date),
 		Meal:            meal,
 		Name:            pstr(name),
+		Icon:            icon,
 		Quantity:        qty,
 		Units:           units,
 		Calories:        calories,
+		Deleted:         deleted,
 		ProteinG:        protein,
 		FatG:            fat,
 		CarbsG:          carbs,
+		SaturatedFatG:   satFat,
 		FiberG:          fiber,
+		CholesterolMg:   chol,
 		SodiumMg:        sodium,
 		SugarG:          sugar,
 		DurationMinutes: duration,

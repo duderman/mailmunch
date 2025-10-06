@@ -65,6 +65,17 @@ func main() {
 			allowedSenderDomain = v
 		}
 
+		// Data catalog settings for Athena queries.
+		athenaDatabaseName := fmt.Sprintf("%s_%s", project, stack)
+		if v, ok := ctx.GetConfig("mailmunch:athenaDatabaseName"); ok && v != "" {
+			athenaDatabaseName = v
+		}
+
+		athenaTableName := "loseit_entries"
+		if v, ok := ctx.GetConfig("mailmunch:athenaTableName"); ok && v != "" {
+			athenaTableName = v
+		}
+
 		emailsBucket, err := s3.NewBucket(ctx, dataBucketName, &s3.BucketArgs{
 			Bucket: pulumi.String(dataBucketName),
 		}, awsOpts)
@@ -509,7 +520,8 @@ func main() {
 					"OPENAI_SECRET_ARN":       openaiSecret.Arn,
 					"REPORT_EMAIL":            pulumi.String(reportEmail),
 					"SENDER_EMAIL":            pulumi.String(senderEmail),
-					"ATHENA_DATABASE":         pulumi.String("mailmunch_data"),
+					"ATHENA_DATABASE":         pulumi.String(athenaDatabaseName),
+					"ATHENA_TABLE":            pulumi.String(athenaTableName),
 					"ATHENA_WORKGROUP":        pulumi.String("primary"),
 					"ATHENA_RESULTS_BUCKET":   emailsBucket.Bucket,
 					"APPCONFIG_APPLICATION":   app.ID(),
@@ -596,11 +608,68 @@ func main() {
 
 		// Glue database and crawler for curated Parquet
 		glueDb, err := glue.NewCatalogDatabase(ctx, fmt.Sprintf("%s_%s_db", project, stack), &glue.CatalogDatabaseArgs{
-			Name: pulumi.String(fmt.Sprintf("%s_%s", project, stack)),
+			Name: pulumi.String(athenaDatabaseName),
 		}, awsOpts)
 		if err != nil {
 			return err
 		}
+
+		loseitTableLocation := emailsBucket.Bucket.ApplyT(func(b string) string {
+			return fmt.Sprintf("s3://%s/curated/loseit_parquet/", b)
+		}).(pulumi.StringOutput)
+
+		loseitTable, err := glue.NewCatalogTable(ctx, fmt.Sprintf("%s-%s-loseit-table", project, stack), &glue.CatalogTableArgs{
+			DatabaseName: glueDb.Name,
+			Name:         pulumi.String(athenaTableName),
+			TableType:    pulumi.String("EXTERNAL_TABLE"),
+			Parameters: pulumi.StringMap{
+				"EXTERNAL":            pulumi.String("TRUE"),
+				"classification":      pulumi.String("parquet"),
+				"parquet.compression": pulumi.String("SNAPPY"),
+			},
+			StorageDescriptor: &glue.CatalogTableStorageDescriptorArgs{
+				Location:     loseitTableLocation.ToStringPtrOutput(),
+				InputFormat:  pulumi.String("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"),
+				OutputFormat: pulumi.String("org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"),
+				SerDeInfo: &glue.CatalogTableStorageDescriptorSerDeInfoArgs{
+					SerializationLibrary: pulumi.String("org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"),
+					Parameters: pulumi.StringMap{
+						"serialization.format": pulumi.String("1"),
+					},
+				},
+				Columns: glue.CatalogTableStorageDescriptorColumnArray{
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("record_type"), Type: pulumi.String("string")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("date"), Type: pulumi.String("string")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("meal"), Type: pulumi.String("string")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("name"), Type: pulumi.String("string")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("icon"), Type: pulumi.String("string")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("quantity"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("units"), Type: pulumi.String("string")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("calories"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("deleted"), Type: pulumi.String("boolean")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("fat_g"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("protein_g"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("carbs_g"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("saturated_fat_g"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("sugar_g"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("fiber_g"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("cholesterol_mg"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("sodium_mg"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("duration_minutes"), Type: pulumi.String("double")},
+					&glue.CatalogTableStorageDescriptorColumnArgs{Name: pulumi.String("distance_km"), Type: pulumi.String("double")},
+				},
+			},
+			PartitionKeys: glue.CatalogTablePartitionKeyArray{
+				&glue.CatalogTablePartitionKeyArgs{Name: pulumi.String("year"), Type: pulumi.String("string")},
+				&glue.CatalogTablePartitionKeyArgs{Name: pulumi.String("month"), Type: pulumi.String("string")},
+				&glue.CatalogTablePartitionKeyArgs{Name: pulumi.String("day"), Type: pulumi.String("string")},
+			},
+		}, awsOpts)
+		if err != nil {
+			return err
+		}
+
+		ctx.Export("loseitTable", loseitTable.Name)
 
 		// Glue assume role policy
 		glueAssumeRolePolicy, err := iam.GetPolicyDocument(ctx, &iam.GetPolicyDocumentArgs{
@@ -647,14 +716,14 @@ func main() {
 					Actions: []string{
 						"s3:GetObject",
 					},
-					Resources: []string{"arn:aws:s3:::" + fmt.Sprintf("%s-data-*", fmt.Sprintf("%s-%s", project, stack)) + "/curated/*"},
+					Resources: []string{"arn:aws:s3:::" + dataBucketName + "/*"},
 				},
 				{
 					Effect: pulumi.StringRef("Allow"),
 					Actions: []string{
 						"s3:ListBucket",
 					},
-					Resources: []string{"arn:aws:s3:::" + fmt.Sprintf("%s-data-*", fmt.Sprintf("%s-%s", project, stack))},
+					Resources: []string{"arn:aws:s3:::" + dataBucketName},
 					Conditions: []iam.GetPolicyDocumentStatementCondition{
 						{
 							Test:     "StringLike",
@@ -683,6 +752,8 @@ func main() {
 			S3Targets: glue.CrawlerS3TargetArray{
 				&glue.CrawlerS3TargetArgs{Path: emailsBucket.Bucket.ApplyT(func(b string) string { return fmt.Sprintf("s3://%s/curated/loseit_parquet/", b) }).(pulumi.StringOutput)},
 			},
+			// Run every Sunday one hour before the weekly report (17:00 UTC / 6 pm London during DST).
+			Schedule:    pulumi.String("cron(0 17 ? * SUN *)"),
 			TablePrefix: pulumi.String("loseit_"),
 		}, awsOpts)
 		if err != nil {

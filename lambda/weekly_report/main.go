@@ -44,6 +44,7 @@ type Config struct {
 	Region                 string
 	BasePrompt             string
 	AthenaDatabase         string
+	AthenaTable            string
 	AthenaWorkgroup        string
 	AthenaResultsBucket    string
 	AppConfigApplication   string
@@ -62,6 +63,7 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 		SenderEmail:            getEnvOrDefault("SENDER_EMAIL", ""),
 		Region:                 getEnvOrDefault("AWS_REGION", "eu-west-2"),
 		AthenaDatabase:         getEnvOrDefault("ATHENA_DATABASE", "mailmunch_dev_db"),
+		AthenaTable:            getEnvOrDefault("ATHENA_TABLE", "loseit_entries"),
 		AthenaWorkgroup:        getEnvOrDefault("ATHENA_WORKGROUP", "primary"),
 		AthenaResultsBucket:    getEnvOrDefault("ATHENA_RESULTS_BUCKET", ""),
 		AppConfigApplication:   getEnvOrDefault("APPCONFIG_APPLICATION", ""),
@@ -266,43 +268,30 @@ func getWeekRange(date time.Time) (start, end time.Time) {
 // queryWeeklyDataWithAthena executes an Athena query to get raw food data for the specified week
 func queryWeeklyDataWithAthena(ctx context.Context, athenaClient *athena.Athena, config *Config, startDate, endDate time.Time) (*WeeklyData, error) {
 	query := fmt.Sprintf(`
-		SELECT date, food_name, quantity, unit, calories, protein, carbs, fat, fiber, sugar, sodium
-		FROM %s.food_entries
-		WHERE date >= '%s' AND date <= '%s'
+		SELECT
+			date,
+			name AS food_name,
+			quantity,
+			units AS unit,
+			calories,
+			protein_g AS protein,
+			carbs_g AS carbs,
+			fat_g AS fat,
+			fiber_g AS fiber,
+			sugar_g AS sugar,
+			sodium_mg AS sodium
+		FROM %s.%s
+		WHERE record_type <> 'exercise' AND date >= '%s' AND date <= '%s'
 		ORDER BY date, food_name
-	`, config.AthenaDatabase, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	`, config.AthenaDatabase, config.AthenaTable, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 
-	// Start query execution
-	queryExecution, err := athenaClient.StartQueryExecutionWithContext(ctx, &athena.StartQueryExecutionInput{
-		QueryString: aws.String(query),
-		WorkGroup:   aws.String(config.AthenaWorkgroup),
-		ResultConfiguration: &athena.ResultConfiguration{
-			OutputLocation: aws.String(fmt.Sprintf("s3://%s/athena-results/", config.AthenaResultsBucket)),
-		},
-	})
+	queryExecutionID, err := executeAthenaQuery(ctx, athenaClient, config, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start Athena query execution: %v", err)
+		return nil, err
 	}
 
-	// Wait for query to complete
-	queryExecutionID := *queryExecution.QueryExecutionId
-	for {
-		result, err := athenaClient.GetQueryExecutionWithContext(ctx, &athena.GetQueryExecutionInput{
-			QueryExecutionId: aws.String(queryExecutionID),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get query execution status: %v", err)
-		}
-
-		status := *result.QueryExecution.Status.State
-		if status == athena.QueryExecutionStateSucceeded {
-			break
-		} else if status == athena.QueryExecutionStateFailed || status == athena.QueryExecutionStateCancelled {
-			return nil, fmt.Errorf("query execution failed with status: %s", status)
-		}
-
-		// Wait before checking again
-		time.Sleep(2 * time.Second)
+	if err := waitForAthenaQueryCompletion(ctx, athenaClient, queryExecutionID); err != nil {
+		return nil, err
 	}
 
 	// Get query results
@@ -341,6 +330,74 @@ func queryWeeklyDataWithAthena(ctx context.Context, athenaClient *athena.Athena,
 		EndDate:   endDate.Format("2006-01-02"),
 		RawData:   rawData.String(),
 	}, nil
+}
+
+func executeAthenaQuery(ctx context.Context, athenaClient *athena.Athena, config *Config, query string) (string, error) {
+	result, err := athenaClient.StartQueryExecutionWithContext(ctx, &athena.StartQueryExecutionInput{
+		QueryString: aws.String(query),
+		WorkGroup:   aws.String(config.AthenaWorkgroup),
+		ResultConfiguration: &athena.ResultConfiguration{
+			OutputLocation: aws.String(fmt.Sprintf("s3://%s/athena-results/", config.AthenaResultsBucket)),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to start Athena query execution: %w", err)
+	}
+	if result.QueryExecutionId == nil {
+		return "", fmt.Errorf("Athena did not return a query execution ID")
+	}
+	return *result.QueryExecutionId, nil
+}
+
+func waitForAthenaQueryCompletion(ctx context.Context, athenaClient *athena.Athena, queryExecutionID string) error {
+	for {
+		result, err := athenaClient.GetQueryExecutionWithContext(ctx, &athena.GetQueryExecutionInput{
+			QueryExecutionId: aws.String(queryExecutionID),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get query execution status: %w", err)
+		}
+
+		statusInfo := result.QueryExecution.Status
+		status := aws.StringValue(statusInfo.State)
+		if status == athena.QueryExecutionStateSucceeded {
+			return nil
+		}
+		if status == athena.QueryExecutionStateFailed || status == athena.QueryExecutionStateCancelled {
+			reason := strings.TrimSpace(aws.StringValue(statusInfo.StateChangeReason))
+			if statusInfo.AthenaError != nil {
+				errTypeStr := ""
+				if statusInfo.AthenaError.ErrorType != nil {
+					errTypeStr = fmt.Sprintf("type=%d", aws.Int64Value(statusInfo.AthenaError.ErrorType))
+				}
+				errMsg := strings.TrimSpace(aws.StringValue(statusInfo.AthenaError.ErrorMessage))
+				formatted := ""
+				switch {
+				case errTypeStr != "" && errMsg != "":
+					formatted = fmt.Sprintf("%s: %s", errTypeStr, errMsg)
+				case errTypeStr != "":
+					formatted = errTypeStr
+				case errMsg != "":
+					formatted = errMsg
+				}
+				if formatted != "" {
+					if reason != "" {
+						reason = fmt.Sprintf("%s; %s", reason, formatted)
+					} else {
+						reason = formatted
+					}
+				}
+			}
+			if reason == "" {
+				reason = "unknown"
+			}
+			log.Printf("Athena query failed (status=%s): %s", status, reason)
+			return fmt.Errorf("query execution failed with status: %s, reason: %s", status, reason)
+		}
+
+		// Wait before checking again
+		time.Sleep(1 * time.Second)
+	}
 }
 
 func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previousWeek *WeeklyData) (string, error) {
