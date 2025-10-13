@@ -443,7 +443,7 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 					},
 				},
 			},
-			MaxCompletionTokens: openai.Int(5000),
+			MaxCompletionTokens: openai.Int(10000),
 		},
 	)
 
