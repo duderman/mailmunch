@@ -144,10 +144,13 @@ func main() {
 			return fmt.Errorf("failed to read weekly_report_prompt.txt: %w", err)
 		}
 
+		const defaultSystemPrompt = "Act as a nutritionist and fitness coach. Provide detailed, actionable advice based on provided food diary data."
+
 		// Create JSON configuration with the prompt
 		configJSON := fmt.Sprintf(`{
-			"weekly_report_base_prompt": %q
-		}`, string(promptContent))
+			"weekly_report_base_prompt": %q,
+			"weekly_report_system_prompt": %q
+		}`, string(promptContent), defaultSystemPrompt)
 
 		configVersion, err := appconfig.NewHostedConfigurationVersion(ctx, fmt.Sprintf("%s-%s-configv1", project, stack), &appconfig.HostedConfigurationVersionArgs{
 			ApplicationId:          app.ID(),

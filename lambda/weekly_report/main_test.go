@@ -202,7 +202,7 @@ func TestLambdaHandlerComponentsIntegration(t *testing.T) {
 	// Test successful configuration parsing
 	t.Run("successful_configuration_parsing", func(t *testing.T) {
 		// Test AppConfig configuration parsing (simulates what getPromptFromAppConfig does)
-		configJSON := `{"weekly_report_base_prompt": "Test prompt for weekly analysis"}`
+		configJSON := `{"weekly_report_base_prompt": "Test prompt for weekly analysis", "weekly_report_system_prompt": "System prompt example"}`
 		var configData map[string]string
 		err := json.Unmarshal([]byte(configJSON), &configData)
 		if err != nil {
@@ -211,6 +211,10 @@ func TestLambdaHandlerComponentsIntegration(t *testing.T) {
 
 		if prompt, exists := configData["weekly_report_base_prompt"]; !exists || prompt != "Test prompt for weekly analysis" {
 			t.Error("Expected prompt not found in config")
+		}
+
+		if systemPrompt, exists := configData["weekly_report_system_prompt"]; !exists || systemPrompt != "System prompt example" {
+			t.Error("Expected system prompt not found in config")
 		}
 
 		// Test secret parsing (JSON format) - simulates what getOpenAIAPIKey does

@@ -42,6 +42,7 @@ type Config struct {
 	ReportEmail            string
 	SenderEmail            string
 	Region                 string
+	SystemPrompt           string
 	BasePrompt             string
 	AthenaDatabase         string
 	AthenaTable            string
@@ -101,7 +102,7 @@ func handler(ctx context.Context, event events.CloudWatchEvent) error {
 	appConfigClient := appconfigdata.New(sess)
 
 	// Get prompt configuration from AppConfig
-	config.BasePrompt, err = getPromptFromAppConfig(appConfigClient, config)
+	config.BasePrompt, config.SystemPrompt, err = getPromptsFromAppConfig(appConfigClient, config)
 	if err != nil {
 		log.Printf("Failed to retrieve prompt from AppConfig: %v", err)
 		return err
@@ -202,7 +203,7 @@ func getOpenAIAPIKey(secretsClient *secretsmanager.SecretsManager, secretArn str
 	return *result.SecretString, nil
 }
 
-func getPromptFromAppConfig(appConfigClient *appconfigdata.AppConfigData, config *Config) (string, error) {
+func getPromptsFromAppConfig(appConfigClient *appconfigdata.AppConfigData, config *Config) (string, string, error) {
 	// Start a configuration session
 	sessionInput := &appconfigdata.StartConfigurationSessionInput{
 		ApplicationIdentifier:          aws.String(config.AppConfigApplication),
@@ -212,7 +213,7 @@ func getPromptFromAppConfig(appConfigClient *appconfigdata.AppConfigData, config
 
 	sessionResult, err := appConfigClient.StartConfigurationSession(sessionInput)
 	if err != nil {
-		return "", fmt.Errorf("failed to start configuration session: %w", err)
+		return "", "", fmt.Errorf("failed to start configuration session: %w", err)
 	}
 
 	// Get the latest configuration
@@ -222,21 +223,28 @@ func getPromptFromAppConfig(appConfigClient *appconfigdata.AppConfigData, config
 
 	result, err := appConfigClient.GetLatestConfiguration(configInput)
 	if err != nil {
-		return "", fmt.Errorf("failed to get latest configuration from AppConfig: %w", err)
+		return "", "", fmt.Errorf("failed to get latest configuration from AppConfig: %w", err)
 	}
 
 	// Parse the JSON configuration
 	var configData map[string]string
 	if err := json.Unmarshal(result.Configuration, &configData); err != nil {
-		return "", fmt.Errorf("failed to parse AppConfig content as JSON: %w", err)
+		return "", "", fmt.Errorf("failed to parse AppConfig content as JSON: %w", err)
 	}
 
 	// Look for the weekly_report_base_prompt field
-	if prompt, exists := configData["weekly_report_base_prompt"]; exists {
-		return prompt, nil
+	basePrompt, baseOk := configData["weekly_report_base_prompt"]
+	systemPrompt, sysOk := configData["weekly_report_system_prompt"]
+
+	if !baseOk {
+		return "", "", fmt.Errorf("weekly_report_base_prompt field not found in AppConfig")
 	}
 
-	return "", fmt.Errorf("weekly_report_base_prompt field not found in AppConfig")
+	if !sysOk {
+		return "", "", fmt.Errorf("weekly_report_system_prompt field not found in AppConfig")
+	}
+
+	return basePrompt, systemPrompt, nil
 }
 
 func londonTimeZone() *time.Location {
@@ -416,7 +424,7 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
-					Content: "You are a helpful nutritionist and fitness coach who provides detailed, actionable advice based on food diary data.",
+					Content: config.SystemPrompt,
 				},
 				{
 					Role:    openai.ChatMessageRoleUser,
@@ -446,7 +454,7 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 	)
 
 	if refusal := strings.TrimSpace(choice.Message.Refusal); refusal != "" {
-		log.Printf("OpenAI refusal detected: %s", refusal)
+		log.Printf("OpenAI refusal detected; first 160 chars: %s", truncateString(refusal, 160))
 	}
 
 	analysis := choice.Message.Content
@@ -456,6 +464,17 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 	log.Printf("Received %d chars analysis from OpenAI", len(analysis))
 
 	return analysis, nil
+}
+
+// truncateString guards log messages from flooding CloudWatch when refusals are verbose.
+func truncateString(input string, maxLen int) string {
+	if len(input) <= maxLen {
+		return input
+	}
+	if maxLen <= 3 {
+		return input[:maxLen]
+	}
+	return input[:maxLen-3] + "..."
 }
 
 func buildAnalysisPrompt(basePrompt string, currentWeek, previousWeek *WeeklyData) string {
