@@ -18,7 +18,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/athena"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/ses"
-	"github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/shared"
 )
 
 // WeeklyReportEvent represents the EventBridge event that triggers this Lambda
@@ -409,29 +411,39 @@ func waitForAthenaQueryCompletion(ctx context.Context, athenaClient *athena.Athe
 	}
 }
 
+const openAIChatModel = "gpt-5"
+
 func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previousWeek *WeeklyData) (string, error) {
-	client := openai.NewClient(openaiAPIKey)
+	client := openai.NewClient(
+		option.WithAPIKey(openaiAPIKey),
+	)
 
 	// Prepare data for OpenAI
 	prompt := buildAnalysisPrompt(config.BasePrompt, currentWeek, previousWeek)
 
 	log.Printf("Sending request to OpenAI with %d chars prompt", len(prompt))
 
-	resp, err := client.CreateChatCompletion(
+	resp, err := client.Chat.Completions.New(
 		context.Background(),
-		openai.ChatCompletionRequest{
-			Model: openai.GPT5,
-			Messages: []openai.ChatCompletionMessage{
+		openai.ChatCompletionNewParams{
+			Model: shared.ChatModel(openAIChatModel),
+			Messages: []openai.ChatCompletionMessageParamUnion{
 				{
-					Role:    openai.ChatMessageRoleSystem,
-					Content: config.SystemPrompt,
+					OfSystem: &openai.ChatCompletionSystemMessageParam{
+						Content: openai.ChatCompletionSystemMessageParamContentUnion{
+							OfString: openai.String(config.SystemPrompt),
+						},
+					},
 				},
 				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: prompt,
+					OfUser: &openai.ChatCompletionUserMessageParam{
+						Content: openai.ChatCompletionUserMessageParamContentUnion{
+							OfString: openai.String(prompt),
+						},
+					},
 				},
 			},
-			MaxCompletionTokens: 2000,
+			MaxCompletionTokens: openai.Int(5000),
 		},
 	)
 
@@ -439,7 +451,7 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 		return "", fmt.Errorf("OpenAI API error: %w", err)
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp == nil || len(resp.Choices) == 0 {
 		return "", fmt.Errorf("no response from OpenAI")
 	}
 
@@ -457,8 +469,8 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 		log.Printf("OpenAI refusal detected; first 160 chars: %s", truncateString(refusal, 160))
 	}
 
-	analysis := choice.Message.Content
-	if len(analysis) == 0 {
+	analysis := extractAssistantContent(choice.Message)
+	if len(strings.TrimSpace(analysis)) == 0 {
 		log.Printf("Warning: OpenAI returned empty assistant content for weekly report prompt")
 	}
 	log.Printf("Received %d chars analysis from OpenAI", len(analysis))
@@ -475,6 +487,16 @@ func truncateString(input string, maxLen int) string {
 		return input[:maxLen]
 	}
 	return input[:maxLen-3] + "..."
+}
+
+func extractAssistantContent(msg openai.ChatCompletionMessage) string {
+	if trimmed := strings.TrimSpace(msg.Content); trimmed != "" {
+		return msg.Content
+	}
+	if trimmed := strings.TrimSpace(msg.Refusal); trimmed != "" {
+		return trimmed
+	}
+	return ""
 }
 
 func buildAnalysisPrompt(basePrompt string, currentWeek, previousWeek *WeeklyData) string {
