@@ -345,7 +345,7 @@ func executeAthenaQuery(ctx context.Context, athenaClient *athena.Athena, config
 		return "", fmt.Errorf("failed to start Athena query execution: %w", err)
 	}
 	if result.QueryExecutionId == nil {
-		return "", fmt.Errorf("Athena did not return a query execution ID")
+		return "", fmt.Errorf("athena did not return a query execution ID")
 	}
 	return *result.QueryExecutionId, nil
 }
@@ -435,7 +435,24 @@ func generateAIReport(openaiAPIKey string, config *Config, currentWeek, previous
 		return "", fmt.Errorf("no response from OpenAI")
 	}
 
-	analysis := resp.Choices[0].Message.Content
+	choice := resp.Choices[0]
+
+	log.Printf(
+		"OpenAI completion usage: prompt=%d completion=%d total=%d (finish_reason=%s)",
+		resp.Usage.PromptTokens,
+		resp.Usage.CompletionTokens,
+		resp.Usage.TotalTokens,
+		choice.FinishReason,
+	)
+
+	if refusal := strings.TrimSpace(choice.Message.Refusal); refusal != "" {
+		log.Printf("OpenAI refusal detected: %s", refusal)
+	}
+
+	analysis := choice.Message.Content
+	if len(analysis) == 0 {
+		log.Printf("Warning: OpenAI returned empty assistant content for weekly report prompt")
+	}
 	log.Printf("Received %d chars analysis from OpenAI", len(analysis))
 
 	return analysis, nil
